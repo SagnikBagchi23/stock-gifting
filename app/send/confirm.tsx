@@ -287,7 +287,7 @@ export default function PreviewGift() {
         <Button
           title="Share link"
           onPress={() => {
-            const link = Linking.createURL(`/receive/${symbol}`, {
+            const expUrl = Linking.createURL(`/receive/${symbol}`, {
               queryParams: {
                 amount: amount ?? '',
                 unit: unit ?? '',
@@ -295,6 +295,10 @@ export default function PreviewGift() {
                 gradient: String(activeGradient),
               },
             });
+            // Wrap in expo.dev/go so the link is a real https:// URL that
+            // messaging apps render as a tappable hyperlink. Tapping opens
+            // Expo Go directly to the receive screen.
+            const link = `https://expo.dev/go?url=${encodeURIComponent(expUrl)}`;
             Share.share({ message: link, url: link });
           }}
         />
