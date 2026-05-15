@@ -12,8 +12,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
@@ -33,13 +33,11 @@ const GRADIENTS = [
   require('@/assets/preview-card/gradient 5.png'),
 ] as const;
 
-const GROWW_MARK = require('@/logos/GROWW.png');
-
 const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
 const SWATCH_SIZE = 40;
-const MAX_TILT = 12; // degrees
+const MAX_TILT = 17; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
 const FADE_MS = 280;
@@ -52,8 +50,6 @@ export default function PreviewGift() {
     price: string;
     message: string;
   }>();
-  const insets = useSafeAreaInsets();
-
   const stock = findStock(symbol ?? '');
   const stockLogo = stock ? getStockLogo(stock.symbol) : null;
   const qty = parseFloat(amount ?? '0');
@@ -180,18 +176,6 @@ export default function PreviewGift() {
     opacity: flashOpacity.value,
   }));
 
-  // Specular: white oval that drifts opposite to tilt, simulating a light source
-  const specularStyle = useAnimatedStyle(() => {
-    const tx = interpolate(tiltY.value, [-MAX_TILT, MAX_TILT], [45, -45]);
-    const ty = interpolate(tiltX.value, [-MAX_TILT, MAX_TILT], [-30, 30]);
-    const mag = Math.sqrt(tiltX.value * tiltX.value + tiltY.value * tiltY.value);
-    const opacity = interpolate(mag, [0, MAX_TILT * 1.4], [0.05, 0.2]);
-    return {
-      transform: [{ translateX: tx }, { translateY: ty }],
-      opacity,
-    };
-  });
-
   return (
     <Screen padded={false}>
       <AppBar
@@ -228,12 +212,6 @@ export default function PreviewGift() {
               style={[StyleSheet.absoluteFill, styles.flashOverlay, flashStyle]}
               pointerEvents="none"
             />
-
-            {/* Specular highlight — shifts with gyro tilt */}
-            <Animated.View style={[styles.specular, specularStyle]} pointerEvents="none" />
-
-            {/* Groww brand mark */}
-            <Image source={GROWW_MARK} style={styles.growwMark} resizeMode="contain" />
 
             {/* Occasion message */}
             <Text style={styles.messageText} numberOfLines={2}>
@@ -275,10 +253,20 @@ export default function PreviewGift() {
       </View>
 
       {/* Docked CTA */}
-      <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, spacing.m) }]}>
+      <View style={[styles.cta, { paddingBottom: spacing.l }]}>
         <Button
           title="Share link"
-          onPress={() => Share.share({ message: `I'm gifting you a stock! 🎁` })}
+          onPress={() => {
+            const link = Linking.createURL(`/receive/${symbol}`, {
+              queryParams: {
+                amount: amount ?? '',
+                unit: unit ?? '',
+                message: message ?? '',
+                gradient: String(activeGradient),
+              },
+            });
+            Share.share({ message: `I gifted you a stock! Tap to claim it: ${link}`, url: link });
+          }}
         />
       </View>
     </Screen>
@@ -302,23 +290,6 @@ const styles = StyleSheet.create({
   flashOverlay: {
     backgroundColor: '#FFFFFF',
     borderRadius: CARD_RADIUS,
-  },
-  specular: {
-    position: 'absolute',
-    width: 180,
-    height: 110,
-    borderRadius: 90,
-    backgroundColor: '#FFFFFF',
-    // Center on card; moves with tilt via transform in specularStyle
-    top: CARD_H / 2 - 55,
-    left: CARD_W / 2 - 90,
-  },
-  growwMark: {
-    position: 'absolute',
-    top: 24,
-    left: 24,
-    width: 24,
-    height: 24,
   },
   messageText: {
     position: 'absolute',
