@@ -265,7 +265,7 @@ export default function PreviewGift() {
                 gradient: String(activeGradient),
               },
             });
-            Share.share({ message: `I gifted you a stock! Tap to claim it: ${link}`, url: link });
+            Share.share({ message: link, url: link });
           }}
         />
       </View>
