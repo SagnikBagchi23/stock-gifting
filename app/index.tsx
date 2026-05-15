@@ -18,18 +18,22 @@ import { spacing, type, radius } from '@/constants/tokens';
 import { setDisplayName } from '@/lib/identity';
 import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
-// 9 bubbles spanning full viewport width. Positions work for ~390px wide screens;
-// the container clips overflow so a few bubbles extend slightly off-edge.
+// 8 bubbles in a staggered 4+4 grid. All positions ensure:
+//   • left >= 0, left+size <= 390 (no horizontal clip)
+//   • top - amplitude >= 0 (no top clip when animated up)
+//   • top + size <= 170 (no bottom clip)
+//   • every circle pair has centre-distance > sum of radii (no overlap)
 const CIRCLES = [
-  { size: 70,  left: -8,   top: 20,  amplitude: 7,  duration: 3200, delay: 0    },
-  { size: 55,  left: 55,   top: 5,   amplitude: 9,  duration: 2900, delay: 500  },
-  { size: 40,  left: 105,  top: 95,  amplitude: 10, duration: 2600, delay: 900  },
-  { size: 65,  left: 135,  top: 10,  amplitude: 6,  duration: 3600, delay: 300  },
-  { size: 35,  left: 205,  top: 80,  amplitude: 12, duration: 2800, delay: 700  },
-  { size: 90,  left: 230,  top: 25,  amplitude: 5,  duration: 4200, delay: 1100 },
-  { size: 45,  left: 315,  top: 0,   amplitude: 8,  duration: 3000, delay: 200  },
-  { size: 30,  left: 310,  top: 105, amplitude: 11, duration: 2700, delay: 600  },
-  { size: 55,  left: -5,   top: 100, amplitude: 8,  duration: 3400, delay: 800  },
+  // Row 1 — left-to-right across top half
+  { size: 68, left:  8, top: 10, amplitude: 6, duration: 3400, delay:    0 },
+  { size: 76, left: 98, top: 10, amplitude: 8, duration: 2900, delay:  400 },
+  { size: 72, left:188, top: 12, amplitude: 7, duration: 3200, delay:  800 },
+  { size: 64, left:278, top: 12, amplitude: 9, duration: 2700, delay:  200 },
+  // Row 2 — staggered into the gaps between row-1 bubbles
+  { size: 56, left: 50, top:100, amplitude:10, duration: 3000, delay:  600 },
+  { size: 64, left:144, top: 96, amplitude: 7, duration: 3600, delay: 1000 },
+  { size: 60, left:238, top:100, amplitude: 8, duration: 2800, delay:  300 },
+  { size: 72, left:308, top: 90, amplitude: 6, duration: 3100, delay:  700 },
 ] as const;
 
 const CLUSTER_H = 170;
@@ -146,8 +150,8 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Input + CTA */}
-        <View style={[styles.inputSection, { paddingBottom: insets.bottom + spacing.l }]}>
+        {/* Input + CTA — 16 px gap between button bottom and keyboard top */}
+        <View style={[styles.inputSection, { paddingBottom: spacing.l }]}>
           <View style={styles.fieldWrap}>
             <View
               style={[
@@ -210,6 +214,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     gap: spacing.m,
+    // Vertical padding keeps the cluster container from touching the app bar
+    // above or the input section below — bubbles can't escape overflow:hidden,
+    // but the cluster view itself needs room.
+    paddingTop: spacing.l,
+    paddingBottom: spacing.m,
   },
   cluster: {
     width: '100%',
