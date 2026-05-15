@@ -37,10 +37,11 @@ export default function PickStock() {
     );
   }, [q]);
 
-  const enriched = useMemo(
-    () => filtered.map((s) => ({ ...s, pricePerShare: prices[s.symbol] ?? s.pricePerShare })),
-    [filtered, prices],
-  );
+  const enriched = useMemo(() => {
+    const mapped = filtered.map((s) => ({ ...s, pricePerShare: prices[s.symbol] ?? s.pricePerShare }));
+    mapped.sort((a, b) => b.pricePerShare * b.sharesHeld - a.pricePerShare * a.sharesHeld);
+    return mapped;
+  }, [filtered, prices]);
 
   return (
     <Screen padded={false}>
@@ -88,6 +89,16 @@ export default function PickStock() {
         </View>
       )}
 
+      {/* Header row: stock count left, column labels right */}
+      <View style={[styles.listHeader, { paddingHorizontal: spacing.l }]}>
+        <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
+          {enriched.length} stock{enriched.length !== 1 ? 's' : ''}
+        </Text>
+        <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
+          Current / Invested
+        </Text>
+      </View>
+
       <FlatList
         data={enriched}
         keyExtractor={(s) => s.symbol}
@@ -126,6 +137,12 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     padding: 0,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.s,
   },
   empty: {
     alignItems: 'center',

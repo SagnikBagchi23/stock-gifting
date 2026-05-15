@@ -14,6 +14,12 @@ type Props = {
 export function StockListItem({ stock, onPress }: Props) {
   const { colors } = useTheme();
   const currentValue = stock.pricePerShare * stock.sharesHeld;
+  const currentValueColor =
+    currentValue > stock.investedValue
+      ? colors.contentPositive
+      : currentValue < stock.investedValue
+        ? colors.contentNegative
+        : colors.contentPrimary;
 
   return (
     <Pressable
@@ -45,7 +51,7 @@ export function StockListItem({ stock, onPress }: Props) {
       {/* End: current value + invested */}
       <View style={styles.end}>
         <Text
-          style={[type.bodyBaseHeavy, { color: colors.contentPrimary, textAlign: 'right' }]}
+          style={[type.bodyBaseHeavy, { color: currentValueColor, textAlign: 'right' }]}
           numberOfLines={1}
         >
           {formatINR(currentValue)}
