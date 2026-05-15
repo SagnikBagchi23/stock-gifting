@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/Button';
 import { findStock } from '@/data/stocks';
 import { useTheme } from '@/constants/theme';
 import { spacing, type, radius } from '@/constants/tokens';
-import { formatINR, formatShares } from '@/utils/format';
 
 const MAX_CHARS = 50;
 
@@ -28,14 +27,11 @@ export default function WriteMessage() {
   }>();
   const router = useRouter();
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState('');
   const [inputFocused, setInputFocused] = useState(false);
 
+  const insets = useSafeAreaInsets();
   const stock = findStock(symbol ?? '');
-  const subtitle = stock
-    ? `${formatShares(stock.sharesHeld)} shares • ${formatINR(stock.investedValue)}`
-    : undefined;
 
   const charCount = message.length;
   const remaining = MAX_CHARS - charCount;
@@ -44,11 +40,12 @@ export default function WriteMessage() {
 
   return (
     <Screen padded={false}>
-      <AppBar title="Write a message" subtitle={subtitle} showBack />
+      <AppBar title="Write a message" showBack leftTitle />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <View style={{ flex: 1 }}>
           <View style={styles.fieldSection}>
@@ -95,7 +92,7 @@ export default function WriteMessage() {
           </View>
         </View>
 
-        <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, spacing.m) }]}>
+        <View style={[styles.cta, { paddingBottom: spacing.l }]}>
           <Button
             title="Continue"
             disabled={!canContinue}
@@ -129,7 +126,8 @@ const styles = StyleSheet.create({
   helperRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xs,
+    paddingLeft: spacing.l,
+    paddingRight: spacing.xs,
   },
   cta: {
     paddingHorizontal: spacing.l,
