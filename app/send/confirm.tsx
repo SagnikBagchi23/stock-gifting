@@ -16,6 +16,7 @@ import { BlurView } from 'expo-blur';
 import { useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
@@ -289,16 +290,29 @@ export default function PreviewGift() {
         <Button
           title="Share link"
           onPress={() => {
-            const expUrl = Linking.createURL(`/receive/${symbol}`, {
-              queryParams: {
-                amount: amount ?? '',
-                unit: unit ?? '',
-                message: message ?? '',
-                gradient: String(activeGradient),
-              },
-            });
-            // exp:// is registered by Expo Go as a custom URL scheme.
-            // iOS renders it as a tappable link in iMessage when Expo Go is installed.
+            // Constants.expoGoConfig.debuggerHost is the tunnel host when
+            // `expo start --tunnel` is running (e.g. "abc123.exp.direct:80").
+            // Using it directly guarantees the exp:// URL is publicly reachable.
+            // Fall back to Linking.createURL for same-network / production cases.
+            const host = Constants.expoGoConfig?.debuggerHost;
+            const qs = [
+              `amount=${encodeURIComponent(amount ?? '')}`,
+              `unit=${encodeURIComponent(unit ?? '')}`,
+              `message=${encodeURIComponent(message ?? '')}`,
+              `gradient=${activeGradient}`,
+            ].join('&');
+            const expUrl = host
+              ? `exp://${host}/--/receive/${symbol}?${qs}`
+              : Linking.createURL(`/receive/${symbol}`, {
+                  queryParams: {
+                    amount: amount ?? '',
+                    unit: unit ?? '',
+                    message: message ?? '',
+                    gradient: String(activeGradient),
+                  },
+                });
+            // exp:// is Expo Go's registered custom URL scheme.
+            // iMessage on iOS renders it as a tappable link when Expo Go is installed.
             Share.share({ url: expUrl, message: expUrl });
           }}
         />
