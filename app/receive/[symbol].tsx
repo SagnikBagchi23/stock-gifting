@@ -218,12 +218,14 @@ export default function ReceivePreview() {
           </Animated.View>
 
           {/* Blur bridge — peaks at flip midpoint to hide the face-swap crossover */}
-          <AnimatedBlurView
-            animatedProps={blurProps}
-            tint="default"
-            style={[StyleSheet.absoluteFill, styles.blurOverlay]}
-            pointerEvents="none"
-          />
+          {/* Wrapping View is required: BlurView ignores borderRadius on iOS, the parent View clips it */}
+          <View style={[StyleSheet.absoluteFill, styles.blurOverlay]} pointerEvents="none">
+            <AnimatedBlurView
+              animatedProps={blurProps}
+              tint="default"
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
         </Animated.View>
       </View>
 

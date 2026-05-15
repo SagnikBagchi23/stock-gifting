@@ -237,7 +237,6 @@ const styles = StyleSheet.create({
   cluster: {
     width: '100%',
     height: CLUSTER_H,
-    overflow: 'hidden',
   },
   heroText: {
     gap: 2,

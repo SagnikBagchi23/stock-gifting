@@ -233,12 +233,14 @@ export default function PreviewGift() {
             </Animated.View>
 
             {/* Blur bridge overlay — peaks at crossover midpoint (Emil's technique) */}
-            <AnimatedBlurView
-              animatedProps={blurProps}
-              tint="default"
-              style={[StyleSheet.absoluteFill, styles.blurOverlay]}
-              pointerEvents="none"
-            />
+            {/* Wrapping View is required: BlurView ignores borderRadius on iOS, the parent View clips it */}
+            <View style={[StyleSheet.absoluteFill, styles.blurOverlay]} pointerEvents="none">
+              <AnimatedBlurView
+                animatedProps={blurProps}
+                tint="default"
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
 
             {/* Card content — fades in after card shell, bridged by revealBlur */}
             <Animated.View style={[StyleSheet.absoluteFill, contentStyle]} pointerEvents="none">
@@ -295,11 +297,9 @@ export default function PreviewGift() {
                 gradient: String(activeGradient),
               },
             });
-            // Wrap in expo.dev/go so the link is a real https:// URL that
-            // messaging apps render as a tappable hyperlink. Tapping opens
-            // Expo Go directly to the receive screen.
-            const link = `https://expo.dev/go?url=${encodeURIComponent(expUrl)}`;
-            Share.share({ message: link, url: link });
+            // exp:// is registered by Expo Go as a custom URL scheme.
+            // iOS renders it as a tappable link in iMessage when Expo Go is installed.
+            Share.share({ url: expUrl, message: expUrl });
           }}
         />
       </View>
