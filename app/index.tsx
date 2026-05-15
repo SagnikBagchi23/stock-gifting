@@ -18,25 +18,24 @@ import { spacing, type, radius } from '@/constants/tokens';
 import { setDisplayName } from '@/lib/identity';
 import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
-// 10 bubbles. 2 anchors at 80px, sizes graduate down to 24px.
+// 10 bubbles. Biggest (80px) sits near screen centre (x≈188).
+// Bottom row strictly alternates large-small so no two similar sizes touch.
 // All positions satisfy:
-//   top ≥ amplitude (no top-clip during upward float)
-//   left+size ≤ 390, top+size ≤ 170 (no edge clip)
 //   centre-distance > sum of radii for every pair (no overlap)
+//   left+size ≤ 390, top+size ≤ 170 (no edge clip)
 const CIRCLES = [
-  // ── Two 80px anchors (horizontally balanced, centres at x≈70 and x≈308)
-  { size: 80, left: 30, top: 10, amplitude: 5, duration: 3600, delay:    0 },
-  { size: 80, left:268, top:  8, amplitude: 4, duration: 3200, delay:  600 },
-  // ── Mid-size top fill
-  { size: 60, left:145, top: 16, amplitude: 6, duration: 2900, delay:  300 },
-  { size: 40, left:348, top: 14, amplitude: 6, duration: 3400, delay:  900 },
-  // ── Bottom cluster — progressively smaller left → right then 24px accent
-  { size: 44, left:  8, top:100, amplitude: 8, duration: 3000, delay:  500 },
-  { size: 36, left: 78, top: 96, amplitude: 8, duration: 2700, delay:  200 },
-  { size: 28, left:150, top:104, amplitude: 8, duration: 3100, delay:  800 },
-  { size: 24, left:194, top:108, amplitude: 8, duration: 2800, delay: 1000 },
-  { size: 40, left:236, top:100, amplitude: 7, duration: 3300, delay:  400 },
-  { size: 52, left:292, top: 94, amplitude: 6, duration: 2600, delay:  700 },
+  // ── Top row: 80px anchor near centre, sizes diverge outward
+  { size: 56, left:  15, top:  5, amplitude: 5, duration: 3400, delay:    0 },
+  { size: 80, left: 148, top:  8, amplitude: 4, duration: 3200, delay:  600 }, // biggest, centre
+  { size: 44, left: 290, top: 10, amplitude: 6, duration: 3000, delay:  300 },
+  { size: 32, left: 352, top: 16, amplitude: 6, duration: 3600, delay:  900 },
+  // ── Bottom row: strict large-small alternation (60, 28, 52, 24, 48, 36)
+  { size: 60, left:  10, top: 94, amplitude: 8, duration: 3000, delay:  500 },
+  { size: 28, left:  80, top:108, amplitude: 8, duration: 2700, delay:  200 },
+  { size: 52, left: 120, top: 96, amplitude: 8, duration: 3100, delay:  800 },
+  { size: 24, left: 180, top:112, amplitude: 8, duration: 2800, delay: 1000 },
+  { size: 48, left: 212, top: 96, amplitude: 7, duration: 3300, delay:  400 },
+  { size: 36, left: 268, top:102, amplitude: 6, duration: 2600, delay:  700 },
 ] as const;
 
 const CLUSTER_H = 170;

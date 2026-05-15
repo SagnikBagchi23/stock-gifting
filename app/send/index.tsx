@@ -1,5 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ActivityIndicator,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +28,10 @@ export default function PickStock() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(true);
 
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const listRef = useRef<FlatList>(null);
+  const searchRef = useRef<TextInput>(null);
+
   useEffect(() => {
     fetchLivePrices(STOCKS.map((s) => s.symbol)).then((p) => {
       setPrices(p);
@@ -27,28 +39,45 @@ export default function PickStock() {
     });
   }, []);
 
+  // Scroll to top when search is focused so the search bar becomes visible
+  const handleSearchFocus = () => {
+    setSearchFocused(true);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  // Animated AppBar bg + border for scroll-aware state
+  const appBarBg = scrollY.interpolate({
+    inputRange: [0, 8],
+    outputRange: [colors.backgroundPrimary, colors.backgroundSurfaceZ1],
+    extrapolate: 'clamp',
+  });
+  const appBarBorder = scrollY.interpolate({
+    inputRange: [0, 8],
+    outputRange: ['transparent', colors.borderPrimary],
+    extrapolate: 'clamp',
+  });
+
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return STOCKS;
     return STOCKS.filter(
-      (s) =>
-        s.symbol.toLowerCase().includes(t) ||
-        s.name.toLowerCase().includes(t),
+      (s) => s.symbol.toLowerCase().includes(t) || s.name.toLowerCase().includes(t),
     );
   }, [q]);
 
   const enriched = useMemo(() => {
-    const mapped = filtered.map((s) => ({ ...s, pricePerShare: prices[s.symbol] ?? s.pricePerShare }));
+    const mapped = filtered.map((s) => ({
+      ...s,
+      pricePerShare: prices[s.symbol] ?? s.pricePerShare,
+    }));
     mapped.sort((a, b) => b.pricePerShare * b.sharesHeld - a.pricePerShare * a.sharesHeld);
     return mapped;
   }, [filtered, prices]);
 
-  return (
-    <Screen padded={false}>
-      <AppBar title="Pick a stock" showBack />
-
-      {/* Search input — styled like the welcome screen's text field */}
-      <View style={[styles.searchContainer, { paddingHorizontal: spacing.l, paddingBottom: spacing.s }]}>
+  const ListHeader = (
+    <View>
+      {/* Search field — scrolls with the list */}
+      <View style={{ paddingHorizontal: spacing.l, paddingTop: spacing.m, paddingBottom: spacing.s }}>
         <View
           style={[
             styles.searchField,
@@ -60,12 +89,13 @@ export default function PickStock() {
         >
           <Feather name="search" size={20} color={colors.contentTertiary} />
           <TextInput
+            ref={searchRef}
             style={[type.bodyBase, styles.searchInput, { color: colors.contentPrimary }]}
             placeholder="Search here..."
             placeholderTextColor={colors.contentTertiary}
             value={q}
             onChangeText={setQ}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={handleSearchFocus}
             onBlur={() => setSearchFocused(false)}
             autoCapitalize="none"
             autoCorrect={false}
@@ -89,7 +119,7 @@ export default function PickStock() {
         </View>
       )}
 
-      {/* Header row: stock count left, column labels right */}
+      {/* Column labels */}
       <View style={[styles.listHeader, { paddingHorizontal: spacing.l }]}>
         <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
           {enriched.length} stock{enriched.length !== 1 ? 's' : ''}
@@ -98,13 +128,30 @@ export default function PickStock() {
           Current / Invested
         </Text>
       </View>
+    </View>
+  );
 
-      <FlatList
+  return (
+    <Screen padded={false}>
+      <AppBar
+        title="Pick a stock"
+        showBack
+        leftTitle
+        animatedStyle={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
+      />
+
+      <Animated.FlatList
+        ref={listRef}
         data={enriched}
         keyExtractor={(s) => s.symbol}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing.m }}
+        ListHeaderComponent={ListHeader}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
+        scrollEventThrottle={16}
         renderItem={({ item }) => (
           <StockListItem
             stock={item}
@@ -122,9 +169,6 @@ export default function PickStock() {
 }
 
 const styles = StyleSheet.create({
-  searchContainer: {
-    paddingTop: spacing.m,
-  },
   searchField: {
     height: 56,
     borderRadius: radius.l,

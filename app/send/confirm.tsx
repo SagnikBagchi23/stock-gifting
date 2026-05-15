@@ -1,0 +1,379 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { DeviceMotion } from 'expo-sensors';
+
+import { Screen } from '@/components/ui/Screen';
+import { AppBar } from '@/components/ui/AppBar';
+import { Button } from '@/components/ui/Button';
+import { findStock } from '@/data/stocks';
+import { getStockLogo } from '@/data/stockLogos';
+import { spacing, radius, fonts } from '@/constants/tokens';
+import { formatINR } from '@/utils/format';
+
+// Metro bundler requires literal require() paths
+const GRADIENTS = [
+  require('@/assets/preview-card/gradient 1.png'),
+  require('@/assets/preview-card/gradient 2.png'),
+  require('@/assets/preview-card/gradient 3.png'),
+  require('@/assets/preview-card/gradient 4.png'),
+  require('@/assets/preview-card/gradient 5.png'),
+] as const;
+
+const GROWW_MARK = require('@/logos/GROWW.png');
+
+const CARD_W = 328;
+const CARD_H = 246;
+const CARD_RADIUS = 24;
+const SWATCH_SIZE = 40;
+const MAX_TILT = 12; // degrees
+const FLOAT_AMP = 8; // px
+const FLOAT_MS = 2600;
+const FADE_MS = 280;
+
+export default function PreviewGift() {
+  const { symbol, amount, unit, message } = useLocalSearchParams<{
+    symbol: string;
+    amount: string;
+    unit: string;
+    price: string;
+    message: string;
+  }>();
+  const insets = useSafeAreaInsets();
+
+  const stock = findStock(symbol ?? '');
+  const stockLogo = stock ? getStockLogo(stock.symbol) : null;
+  const qty = parseFloat(amount ?? '0');
+  const displayAmount =
+    unit === 'rupees' ? formatINR(qty) : `${Number.isFinite(qty) ? qty : 0} shares`;
+
+  // ── Gradient cross-fade state ─────────────────────────────────────────────
+  const [layerA, setLayerA] = useState(0);
+  const [layerB, setLayerB] = useState(0);
+  const [activeGradient, setActiveGradient] = useState(0);
+  const fadeLocked = useRef(false);
+
+  // ── Animated values ───────────────────────────────────────────────────────
+  const fadeProgress = useSharedValue(0); // 0=A visible, 1=B visible
+  const flashOpacity = useSharedValue(0); // brief white flash at crossover
+  const cardScale = useSharedValue(0.9);
+  const cardOpacity = useSharedValue(0);
+  const floatY = useSharedValue(0);
+  const tiltX = useSharedValue(0); // rotateX (pitch)
+  const tiltY = useSharedValue(0); // rotateY (roll)
+
+  // ── Mount enter animation ─────────────────────────────────────────────────
+  useEffect(() => {
+    cardOpacity.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.quad) });
+    cardScale.value = withSpring(1, { damping: 14, stiffness: 180 });
+  }, []);
+
+  // ── Levitation float loop ─────────────────────────────────────────────────
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-FLOAT_AMP, { duration: FLOAT_MS, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: FLOAT_MS, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  // ── Gyroscope tilt ────────────────────────────────────────────────────────
+  // Calibration ref: first reading sets the neutral position
+  const initialBeta = useRef<number | null>(null);
+
+  useEffect(() => {
+    let sub: ReturnType<typeof DeviceMotion.addListener> | undefined;
+
+    DeviceMotion.isAvailableAsync().then((ok) => {
+      if (!ok) return;
+      DeviceMotion.setUpdateInterval(50);
+      sub = DeviceMotion.addListener(({ rotation }) => {
+        if (!rotation) return;
+        // rotation.beta: X-axis tilt (pitch), rotation.gamma: Y-axis tilt (roll) — in degrees
+        if (initialBeta.current === null) initialBeta.current = rotation.beta;
+        const pitchDelta = rotation.beta - initialBeta.current;
+        const rollDeg = rotation.gamma;
+        const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDelta));
+        const ty = Math.max(-MAX_TILT, Math.min(MAX_TILT, rollDeg));
+        tiltX.value = withSpring(tx, { damping: 22, stiffness: 160 });
+        tiltY.value = withSpring(ty, { damping: 22, stiffness: 160 });
+      });
+    });
+
+    return () => sub?.remove();
+  }, []);
+
+  // ── Unlock fade (called from UI thread via runOnJS) ───────────────────────
+  const unlockFade = useCallback(() => {
+    fadeLocked.current = false;
+  }, []);
+
+  // ── Gradient swap with cross-fade ─────────────────────────────────────────
+  const handleSwatchPress = useCallback(
+    (index: number) => {
+      if (fadeLocked.current || index === activeGradient) return;
+      fadeLocked.current = true;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      setActiveGradient(index);
+      setLayerB(index);
+
+      // Brief white flash at the visual crossover point (Emil: blur bridges transitions)
+      flashOpacity.value = withSequence(
+        withTiming(0.1, { duration: FADE_MS * 0.5, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.in(Easing.quad) })
+      );
+
+      fadeProgress.value = withTiming(
+        1,
+        { duration: FADE_MS, easing: Easing.out(Easing.quad) },
+        (finished) => {
+          if (finished) {
+            runOnJS(setLayerA)(index);
+            runOnJS(setLayerB)(index);
+            fadeProgress.value = 0;
+            runOnJS(unlockFade)();
+          }
+        }
+      );
+    },
+    [activeGradient, unlockFade]
+  );
+
+  // ── Animated styles ───────────────────────────────────────────────────────
+  const cardWrapStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [
+      { perspective: 1000 },
+      { rotateX: `${tiltX.value}deg` },
+      { rotateY: `${tiltY.value}deg` },
+      { translateY: floatY.value },
+      { scale: cardScale.value },
+    ],
+  }));
+
+  const layerAStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(fadeProgress.value, [0, 1], [1, 0]),
+  }));
+
+  const layerBStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(fadeProgress.value, [0, 1], [0, 1]),
+  }));
+
+  const flashStyle = useAnimatedStyle(() => ({
+    opacity: flashOpacity.value,
+  }));
+
+  // Specular: white oval that drifts opposite to tilt, simulating a light source
+  const specularStyle = useAnimatedStyle(() => {
+    const tx = interpolate(tiltY.value, [-MAX_TILT, MAX_TILT], [45, -45]);
+    const ty = interpolate(tiltX.value, [-MAX_TILT, MAX_TILT], [-30, 30]);
+    const mag = Math.sqrt(tiltX.value * tiltX.value + tiltY.value * tiltY.value);
+    const opacity = interpolate(mag, [0, MAX_TILT * 1.4], [0.05, 0.2]);
+    return {
+      transform: [{ translateX: tx }, { translateY: ty }],
+      opacity,
+    };
+  });
+
+  return (
+    <Screen padded={false}>
+      <AppBar
+        title="Preview"
+        showBack
+        leftTitle
+        animatedStyle={{ backgroundColor: '#060809', borderBottomWidth: 0 }}
+      />
+
+      <View style={styles.body}>
+        {/* Gift card — 3D tilt + levitation */}
+        <Animated.View style={cardWrapStyle}>
+          <View style={styles.card}>
+            {/* Layer A — current gradient */}
+            <Animated.View style={[StyleSheet.absoluteFill, layerAStyle]}>
+              <ImageBackground
+                source={GRADIENTS[layerA]}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            </Animated.View>
+
+            {/* Layer B — incoming gradient (fades in) */}
+            <Animated.View style={[StyleSheet.absoluteFill, layerBStyle]}>
+              <ImageBackground
+                source={GRADIENTS[layerB]}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            </Animated.View>
+
+            {/* White flash overlay — bridges the visual crossover */}
+            <Animated.View
+              style={[StyleSheet.absoluteFill, styles.flashOverlay, flashStyle]}
+              pointerEvents="none"
+            />
+
+            {/* Specular highlight — shifts with gyro tilt */}
+            <Animated.View style={[styles.specular, specularStyle]} pointerEvents="none" />
+
+            {/* Groww brand mark */}
+            <Image source={GROWW_MARK} style={styles.growwMark} resizeMode="contain" />
+
+            {/* Occasion message */}
+            <Text style={styles.messageText} numberOfLines={2}>
+              {message ?? ''}
+            </Text>
+
+            {/* Bottom row: gift amount + stock logo */}
+            <View style={styles.cardBottom}>
+              <Text style={styles.amountText} adjustsFontSizeToFit numberOfLines={1}>
+                {displayAmount}
+              </Text>
+              {stockLogo && (
+                <Image source={stockLogo} style={styles.stockLogo} resizeMode="contain" />
+              )}
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Gradient swatches */}
+        <View style={styles.swatches}>
+          {GRADIENTS.map((src, i) => {
+            const isActive = i === activeGradient;
+            return (
+              <Pressable
+                key={i}
+                onPress={() => handleSwatchPress(i)}
+                style={[styles.swatch, isActive && styles.swatchActive]}
+              >
+                <ImageBackground
+                  source={src}
+                  style={styles.swatchInner}
+                  imageStyle={{ borderRadius: isActive ? SWATCH_SIZE / 2 - 2 : SWATCH_SIZE / 2 }}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Docked CTA */}
+      <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, spacing.m) }]}>
+        <Button
+          title="Share link"
+          onPress={() => Share.share({ message: `I'm gifting you a stock! 🎁` })}
+        />
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 48,
+    paddingBottom: 70,
+  },
+  card: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+  },
+  flashOverlay: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: CARD_RADIUS,
+  },
+  specular: {
+    position: 'absolute',
+    width: 180,
+    height: 110,
+    borderRadius: 90,
+    backgroundColor: '#FFFFFF',
+    // Center on card; moves with tilt via transform in specularStyle
+    top: CARD_H / 2 - 55,
+    left: CARD_W / 2 - 90,
+  },
+  growwMark: {
+    position: 'absolute',
+    top: 24,
+    left: 24,
+    width: 24,
+    height: 24,
+  },
+  messageText: {
+    position: 'absolute',
+    top: 138,
+    left: 24,
+    right: 24,
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    lineHeight: 32,
+    color: '#FFFFFF',
+  },
+  cardBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 24,
+    paddingTop: 4,
+    paddingHorizontal: 24,
+  },
+  amountText: {
+    fontFamily: fonts.heading,
+    fontSize: 40,
+    lineHeight: 48,
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  stockLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.m,
+  },
+  swatches: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  swatch: {
+    width: SWATCH_SIZE,
+    height: SWATCH_SIZE,
+    borderRadius: SWATCH_SIZE / 2,
+    overflow: 'hidden',
+  },
+  swatchActive: {
+    borderWidth: 2,
+    borderColor: '#F2F5F7',
+  },
+  swatchInner: {
+    flex: 1,
+  },
+  cta: {
+    paddingHorizontal: spacing.l,
+    paddingTop: spacing.s,
+  },
+});

@@ -1,5 +1,6 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, ActivityIndicator, ViewStyle } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/constants/theme';
 import { radius, spacing, type } from '@/constants/tokens';
 
@@ -16,8 +17,8 @@ type Props = {
 
 export function Button({ title, onPress, variant = 'primary', disabled, loading, style }: Props) {
   const { colors } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
 
-  // Per [[feedback_mint_text_on_accent.md]]: text/icons on accent backgrounds are WHITE (contentOnColour).
   const bg =
     disabled
       ? colors.backgroundDisabled
@@ -34,23 +35,45 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading,
         ? colors.contentOnColour
         : colors.contentPrimary;
 
+  const handlePressIn = () => {
+    if (disabled || loading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Animated.spring(scale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 400,
+      mass: 0.8,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 400,
+      mass: 0.8,
+    }).start();
+  };
+
   return (
-    <Pressable
-      onPress={disabled || loading ? undefined : onPress}
-      style={({ pressed }) => [
-        styles.btn,
-        { backgroundColor: bg, opacity: pressed && !disabled ? 0.85 : 1 },
-        style,
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-    >
-      {loading ? (
-        <ActivityIndicator color={fg} />
-      ) : (
-        <Text style={[type.bodyLargeHeavy, { color: fg }]}>{title}</Text>
-      )}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={disabled || loading ? undefined : onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[styles.btn, { backgroundColor: bg }, style]}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !!disabled }}
+      >
+        {loading ? (
+          <ActivityIndicator color={fg} />
+        ) : (
+          <Text style={[type.bodyLargeHeavy, { color: fg }]}>{title}</Text>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
