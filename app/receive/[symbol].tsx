@@ -4,12 +4,14 @@ import Animated, {
   Easing,
   interpolate,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { DeviceMotion } from 'expo-sensors';
@@ -30,14 +32,17 @@ const GRADIENTS = [
   require('@/assets/receive-card/receive 5.png'),
 ] as const;
 
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
 const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
-const MAX_TILT = 15;        // degrees
-const FLIP_PAUSE_MS = 1200; // how long to show front before flipping
-const FLIP_MS = 700;        // flip + slide duration
-const SLIDE_UP = 80;        // px the card slides upward during flip
+const MAX_TILT = 15;
+const FLIP_PAUSE_MS = 1200;
+const FLIP_MS = 700;
+const SLIDE_UP = 80;
 const BTN_H = 48;
+const BLUR_PEAK = 55;
 
 export default function ReceivePreview() {
   const { symbol, amount, unit, message, gradient } = useLocalSearchParams<{
@@ -143,6 +148,11 @@ export default function ReceivePreview() {
     transform: [{ rotateX: '180deg' }],
   }));
 
+  // Blur bridge: peaks at flip midpoint (flipProgress=0.5) — bridges the face swap
+  const blurProps = useAnimatedProps(() => ({
+    intensity: interpolate(flipProgress.value, [0, 0.5, 1], [0, BLUR_PEAK, 0]),
+  }));
+
   const buttonsStyle = useAnimatedStyle(() => ({
     opacity: btnOpacity.value,
     transform: [{ translateY: btnTranslateY.value }],
@@ -206,6 +216,14 @@ export default function ReceivePreview() {
               </View>
             </View>
           </Animated.View>
+
+          {/* Blur bridge — peaks at flip midpoint to hide the face-swap crossover */}
+          <AnimatedBlurView
+            animatedProps={blurProps}
+            tint="default"
+            style={[StyleSheet.absoluteFill, styles.blurOverlay]}
+            pointerEvents="none"
+          />
         </Animated.View>
       </View>
 
@@ -244,6 +262,10 @@ export default function ReceivePreview() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  blurOverlay: {
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
   },
   appBar: {
     paddingHorizontal: spacing.l,
