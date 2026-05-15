@@ -4,6 +4,7 @@ import Animated, {
   Easing,
   interpolate,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -11,6 +12,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
@@ -33,6 +35,8 @@ const GRADIENTS = [
   require('@/assets/preview-card/gradient 5.png'),
 ] as const;
 
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
 const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
@@ -40,7 +44,8 @@ const SWATCH_SIZE = 40;
 const MAX_TILT = 17; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
-const FADE_MS = 280;
+const FADE_MS = 380;
+const BLUR_PEAK = 60;
 
 export default function PreviewGift() {
   const { symbol, amount, unit, message } = useLocalSearchParams<{
@@ -64,7 +69,7 @@ export default function PreviewGift() {
 
   // ── Animated values ───────────────────────────────────────────────────────
   const fadeProgress = useSharedValue(0); // 0=A visible, 1=B visible
-  const flashOpacity = useSharedValue(0); // brief white flash at crossover
+  const blurIntensity = useSharedValue(0); // peaks at crossover midpoint
   const cardScale = useSharedValue(0.9);
   const cardOpacity = useSharedValue(0);
   const floatY = useSharedValue(0);
@@ -130,9 +135,9 @@ export default function PreviewGift() {
       setActiveGradient(index);
       setLayerB(index);
 
-      // Brief white flash at the visual crossover point (Emil: blur bridges transitions)
-      flashOpacity.value = withSequence(
-        withTiming(0.1, { duration: FADE_MS * 0.5, easing: Easing.out(Easing.quad) }),
+      // Blur ramps up to peak at the crossover midpoint, then dissolves
+      blurIntensity.value = withSequence(
+        withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: Easing.out(Easing.quad) }),
         withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.in(Easing.quad) })
       );
 
@@ -172,8 +177,8 @@ export default function PreviewGift() {
     opacity: interpolate(fadeProgress.value, [0, 1], [0, 1]),
   }));
 
-  const flashStyle = useAnimatedStyle(() => ({
-    opacity: flashOpacity.value,
+  const blurProps = useAnimatedProps(() => ({
+    intensity: blurIntensity.value,
   }));
 
   return (
@@ -207,9 +212,11 @@ export default function PreviewGift() {
               />
             </Animated.View>
 
-            {/* White flash overlay — bridges the visual crossover */}
-            <Animated.View
-              style={[StyleSheet.absoluteFill, styles.flashOverlay, flashStyle]}
+            {/* Blur bridge overlay — peaks at crossover midpoint (Emil's technique) */}
+            <AnimatedBlurView
+              animatedProps={blurProps}
+              tint="default"
+              style={[StyleSheet.absoluteFill, styles.blurOverlay]}
               pointerEvents="none"
             />
 
@@ -287,9 +294,9 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
   },
-  flashOverlay: {
-    backgroundColor: '#FFFFFF',
+  blurOverlay: {
     borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
   },
   messageText: {
     position: 'absolute',
