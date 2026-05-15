@@ -68,18 +68,34 @@ export default function PreviewGift() {
   const fadeLocked = useRef(false);
 
   // ── Animated values ───────────────────────────────────────────────────────
-  const fadeProgress = useSharedValue(0); // 0=A visible, 1=B visible
-  const blurIntensity = useSharedValue(0); // peaks at crossover midpoint
+  const fadeProgress = useSharedValue(0);    // 0=A visible, 1=B visible
+  const blurIntensity = useSharedValue(0);   // swatch crossfade bridge
+  const revealBlur = useSharedValue(0);      // initial content-reveal bridge
+  const contentOpacity = useSharedValue(0);  // message + amount + logo
   const cardScale = useSharedValue(0.9);
   const cardOpacity = useSharedValue(0);
   const floatY = useSharedValue(0);
-  const tiltX = useSharedValue(0); // rotateX (pitch)
-  const tiltY = useSharedValue(0); // rotateY (roll)
+  const tiltX = useSharedValue(0);
+  const tiltY = useSharedValue(0);
 
   // ── Mount enter animation ─────────────────────────────────────────────────
   useEffect(() => {
+    // 1. Card shell enters
     cardOpacity.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.quad) });
     cardScale.value = withSpring(1, { damping: 14, stiffness: 180 });
+
+    // 2. Blur ramps up just before card is fully visible (bridges the empty→content swap)
+    revealBlur.value = withSequence(
+      withTiming(0, { duration: 280 }), // wait for card to mostly appear
+      withTiming(BLUR_PEAK, { duration: 200, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 320, easing: Easing.in(Easing.quad) })
+    );
+
+    // 3. Content snaps visible at blur peak (invisible swap — blur hides it)
+    contentOpacity.value = withSequence(
+      withTiming(0, { duration: 460 }), // hold until blur is at peak
+      withTiming(1, { duration: 20 })   // instant snap while blur masks it
+    );
   }, []);
 
   // ── Levitation float loop ─────────────────────────────────────────────────
@@ -178,7 +194,11 @@ export default function PreviewGift() {
   }));
 
   const blurProps = useAnimatedProps(() => ({
-    intensity: blurIntensity.value,
+    intensity: blurIntensity.value + revealBlur.value,
+  }));
+
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
   }));
 
   return (
@@ -220,20 +240,23 @@ export default function PreviewGift() {
               pointerEvents="none"
             />
 
-            {/* Occasion message */}
-            <Text style={styles.messageText} numberOfLines={2}>
-              {message ?? ''}
-            </Text>
-
-            {/* Bottom row: gift amount + stock logo */}
-            <View style={styles.cardBottom}>
-              <Text style={styles.amountText} adjustsFontSizeToFit numberOfLines={1}>
-                {displayAmount}
+            {/* Card content — fades in after card shell, bridged by revealBlur */}
+            <Animated.View style={[StyleSheet.absoluteFill, contentStyle]} pointerEvents="none">
+              {/* Occasion message */}
+              <Text style={styles.messageText} numberOfLines={2}>
+                {message ?? ''}
               </Text>
-              {stockLogo && (
-                <Image source={stockLogo} style={styles.stockLogo} resizeMode="contain" />
-              )}
-            </View>
+
+              {/* Bottom row: gift amount + stock logo */}
+              <View style={styles.cardBottom}>
+                <Text style={styles.amountText} adjustsFontSizeToFit numberOfLines={1}>
+                  {displayAmount}
+                </Text>
+                {stockLogo && (
+                  <Image source={stockLogo} style={styles.stockLogo} resizeMode="contain" />
+                )}
+              </View>
+            </Animated.View>
           </View>
         </Animated.View>
 
