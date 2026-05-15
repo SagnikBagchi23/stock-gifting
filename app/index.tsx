@@ -18,22 +18,25 @@ import { spacing, type, radius } from '@/constants/tokens';
 import { setDisplayName } from '@/lib/identity';
 import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
-// 8 bubbles in a staggered 4+4 grid. All positions ensure:
-//   • left >= 0, left+size <= 390 (no horizontal clip)
-//   • top - amplitude >= 0 (no top clip when animated up)
-//   • top + size <= 170 (no bottom clip)
-//   • every circle pair has centre-distance > sum of radii (no overlap)
+// 10 bubbles. 2 anchors at 80px, sizes graduate down to 24px.
+// All positions satisfy:
+//   top ≥ amplitude (no top-clip during upward float)
+//   left+size ≤ 390, top+size ≤ 170 (no edge clip)
+//   centre-distance > sum of radii for every pair (no overlap)
 const CIRCLES = [
-  // Row 1 — left-to-right across top half
-  { size: 68, left:  8, top: 10, amplitude: 6, duration: 3400, delay:    0 },
-  { size: 76, left: 98, top: 10, amplitude: 8, duration: 2900, delay:  400 },
-  { size: 72, left:188, top: 12, amplitude: 7, duration: 3200, delay:  800 },
-  { size: 64, left:278, top: 12, amplitude: 9, duration: 2700, delay:  200 },
-  // Row 2 — staggered into the gaps between row-1 bubbles
-  { size: 56, left: 50, top:100, amplitude:10, duration: 3000, delay:  600 },
-  { size: 64, left:144, top: 96, amplitude: 7, duration: 3600, delay: 1000 },
-  { size: 60, left:238, top:100, amplitude: 8, duration: 2800, delay:  300 },
-  { size: 72, left:308, top: 90, amplitude: 6, duration: 3100, delay:  700 },
+  // ── Two 80px anchors (horizontally balanced, centres at x≈70 and x≈308)
+  { size: 80, left: 30, top: 10, amplitude: 5, duration: 3600, delay:    0 },
+  { size: 80, left:268, top:  8, amplitude: 4, duration: 3200, delay:  600 },
+  // ── Mid-size top fill
+  { size: 60, left:145, top: 16, amplitude: 6, duration: 2900, delay:  300 },
+  { size: 40, left:348, top: 14, amplitude: 6, duration: 3400, delay:  900 },
+  // ── Bottom cluster — progressively smaller left → right then 24px accent
+  { size: 44, left:  8, top:100, amplitude: 8, duration: 3000, delay:  500 },
+  { size: 36, left: 78, top: 96, amplitude: 8, duration: 2700, delay:  200 },
+  { size: 28, left:150, top:104, amplitude: 8, duration: 3100, delay:  800 },
+  { size: 24, left:194, top:108, amplitude: 8, duration: 2800, delay: 1000 },
+  { size: 40, left:236, top:100, amplitude: 7, duration: 3300, delay:  400 },
+  { size: 52, left:292, top: 94, amplitude: 6, duration: 2600, delay:  700 },
 ] as const;
 
 const CLUSTER_H = 170;
