@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+
+function formatAmountDisplay(raw: string): string {
+  if (!raw) return '';
+  const [intRaw, decRaw] = raw.split('.');
+  const intNum = parseInt(intRaw || '0', 10);
+  const intFormatted = Number.isFinite(intNum) ? intNum.toLocaleString('en-IN') : intRaw;
+  return decRaw !== undefined ? `${intFormatted}.${decRaw}` : intFormatted;
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -25,11 +33,16 @@ export default function ComposeGift() {
 
   const [unit, setUnit] = useState<GiftUnit>('rupees');
   const [amount, setAmount] = useState('');
+  const [hadError, setHadError] = useState(false);
 
   // Cursor blink
   const cursorOpacity = useRef(new Animated.Value(1)).current;
   // Amount scale punch on keypress
   const amountScale = useRef(new Animated.Value(1)).current;
+  // Shake for error feedback
+  const shakeX = useRef(new Animated.Value(0)).current;
+  // Error message fade
+  const errorOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const blink = Animated.loop(
@@ -52,9 +65,37 @@ export default function ComposeGift() {
     }).start();
   };
 
+  const triggerErrorFeedback = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 8, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -8, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+    Animated.timing(errorOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  };
+
   const livePrice = priceParam ? parseFloat(priceParam) : NaN;
   const pricePerShare =
     Number.isFinite(livePrice) && livePrice > 0 ? livePrice : stock?.pricePerShare ?? 0;
+
+  const qty = parseFloat(amount);
+  const maxRupees = (stock?.sharesHeld ?? 0) * pricePerShare;
+  const maxAllowed = unit === 'rupees' ? maxRupees : (stock?.sharesHeld ?? 0);
+  const hasError = Boolean(stock) && Number.isFinite(qty) && qty > 0 && qty > maxAllowed;
+  const canContinue = Number.isFinite(qty) && qty > 0 && !hasError;
+
+  useEffect(() => {
+    if (hasError && !hadError) {
+      triggerErrorFeedback();
+    } else if (!hasError && hadError) {
+      Animated.timing(errorOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+    }
+    setHadError(hasError);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasError]);
 
   if (!stock) {
     return (
@@ -67,10 +108,15 @@ export default function ComposeGift() {
 
   const subtitle = `${formatShares(stock.sharesHeld)} shares • ${formatINR(stock.investedValue)}`;
   const quickValues = unit === 'rupees' ? QUICK_AMOUNTS : QUICK_SHARES;
-  const qty = parseFloat(amount);
-  const canContinue = Number.isFinite(qty) && qty > 0;
+
+  const errorMsg = hasError
+    ? unit === 'rupees'
+      ? `Max you can gift is ${formatINR(maxRupees)}`
+      : `You only have ${formatShares(stock.sharesHeld)} shares`
+    : '';
 
   const handleKey = (key: string) => {
+    if (key !== '⌫' && hasError) return;
     if (key === '⌫') {
       setAmount((prev) => prev.slice(0, -1));
       punchAmount();
@@ -102,7 +148,7 @@ export default function ComposeGift() {
 
   return (
     <Screen padded={false}>
-      <AppBar title={stock.symbol} subtitle={subtitle} showBack />
+      <AppBar title={stock.name} subtitle={subtitle} showBack />
 
       {/* Center content */}
       <View style={styles.body}>
@@ -138,25 +184,35 @@ export default function ComposeGift() {
           </View>
 
           {/* Prominent amount display */}
-          <Animated.View
-            style={[styles.amountRow, { transform: [{ scale: amountScale }] }]}
-          >
-            {unit === 'rupees' && (
-              <Text style={[styles.amountText, { color: colors.contentPrimary }]}>₹</Text>
-            )}
-            {amount.length > 0 && (
-              <Text style={[styles.amountText, { color: colors.contentPrimary }]}>{amount}</Text>
-            )}
+          <Animated.View style={{ alignItems: 'center', gap: spacing.xs }}>
             <Animated.View
-              style={[styles.cursor, { backgroundColor: colors.contentAccent, opacity: cursorOpacity }]}
+              style={[styles.amountRow, { transform: [{ scale: amountScale }, { translateX: shakeX }] }]}
+            >
+              {unit === 'rupees' && (
+                <Text style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}>₹</Text>
+              )}
+              {amount.length > 0 && (
+                <Text style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}>
+                  {formatAmountDisplay(amount)}
+                </Text>
+              )}
+              <Animated.View
+                style={[styles.cursor, { backgroundColor: hasError ? colors.contentNegative : colors.contentAccent, opacity: cursorOpacity }]}
             />
             {unit === 'shares' && amount.length > 0 && (
               <Text
-                style={[type.bodyLargeHeavy, { color: colors.contentSecondary, alignSelf: 'flex-end', marginBottom: 6 }]}
+                style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}
               >
-                {' shares'}
+                {' qty'}
               </Text>
             )}
+            </Animated.View>
+            <Animated.Text
+              style={[type.bodySmall, { color: colors.contentNegative, opacity: errorOpacity }]}
+              numberOfLines={1}
+            >
+              {errorMsg}
+            </Animated.Text>
           </Animated.View>
 
           {/* Quick-select pills */}
@@ -175,7 +231,7 @@ export default function ComposeGift() {
                 ]}
               >
                 <Text style={[type.bodySmallHeavy, { color: colors.contentPrimary }]}>
-                  {unit === 'rupees' ? formatINR(Number(v)) : `${v} shares`}
+                  {unit === 'rupees' ? formatINR(Number(v)) : `${v} qty`}
                 </Text>
               </Pressable>
             ))}
