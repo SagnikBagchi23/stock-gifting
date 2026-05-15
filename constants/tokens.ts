@@ -29,6 +29,7 @@ export const lightColors = {
   contentOnColour: '#FFFFFF',
   borderPrimary: '#E5E6E7',
   borderDisabled: '#EFF0F1',
+  borderNeutral: '#353839',
 } as const;
 
 export const darkColors = {
@@ -57,6 +58,7 @@ export const darkColors = {
   contentOnColour: '#FFFFFF',
   borderPrimary: '#2A2A2A',
   borderDisabled: '#1E1E1E',
+  borderNeutral: '#F2F2F2',
 } as const;
 
 export type ColorTokens = typeof darkColors;

@@ -1,47 +1,53 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/constants/theme';
 import { spacing, type, radius } from '@/constants/tokens';
-import { getDisplayName, setDisplayName } from '@/lib/identity';
-import { listMyGifts, listMyHoldings } from '@/lib/gifts';
-import type { Gift } from '@/types';
-import { formatINR, formatShares } from '@/utils/format';
-import { StockAvatar } from '@/components/ui/StockAvatar';
+import { setDisplayName } from '@/lib/identity';
+import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
-// Bubble config: size/position from Figma (node 1185:476-480)
-// duration = one half-cycle in ms; delay = phase offset so bubbles drift independently
+// 9 bubbles spanning full viewport width. Positions work for ~390px wide screens;
+// the container clips overflow so a few bubbles extend slightly off-edge.
 const CIRCLES = [
-  { size: 63, left: 0,   top: 0,  amplitude: 7,  duration: 3200, delay: 0    },
-  { size: 40, left: 22,  top: 83, amplitude: 10, duration: 2600, delay: 700  },
-  { size: 50, left: 64,  top: 46, amplitude: 8,  duration: 3800, delay: 400  },
-  { size: 90, left: 114, top: 58, amplitude: 5,  duration: 4200, delay: 1100 },
-  { size: 30, left: 141, top: 16, amplitude: 12, duration: 2900, delay: 200  },
+  { size: 70,  left: -8,   top: 20,  amplitude: 7,  duration: 3200, delay: 0    },
+  { size: 55,  left: 55,   top: 5,   amplitude: 9,  duration: 2900, delay: 500  },
+  { size: 40,  left: 105,  top: 95,  amplitude: 10, duration: 2600, delay: 900  },
+  { size: 65,  left: 135,  top: 10,  amplitude: 6,  duration: 3600, delay: 300  },
+  { size: 35,  left: 205,  top: 80,  amplitude: 12, duration: 2800, delay: 700  },
+  { size: 90,  left: 230,  top: 25,  amplitude: 5,  duration: 4200, delay: 1100 },
+  { size: 45,  left: 315,  top: 0,   amplitude: 8,  duration: 3000, delay: 200  },
+  { size: 30,  left: 310,  top: 105, amplitude: 11, duration: 2700, delay: 600  },
+  { size: 55,  left: -5,   top: 100, amplitude: 8,  duration: 3400, delay: 800  },
 ] as const;
 
-const CLUSTER_W = 242;
-const CLUSTER_H = 172;
+const CLUSTER_H = 170;
+const N_LOGOS = CIRCLES.length;
 
-// Each bubble manages its own looping float animation
+function pickSymbols(n: number): string[] {
+  const pool = [...LOGO_SYMBOLS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+
 function FloatingBubble({
-  size, left, top, amplitude, duration, delay, color,
-}: { size: number; left: number; top: number; amplitude: number; duration: number; delay: number; color: string }) {
+  size, left, top, amplitude, duration, delay, logoSrc,
+}: { size: number; left: number; top: number; amplitude: number; duration: number; delay: number; logoSrc: any }) {
+  const { colors } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -66,15 +72,8 @@ function FloatingBubble({
     return () => loop.stop();
   }, []);
 
-  const translateY = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -amplitude],
-  });
-
-  const scale = anim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 1.03, 1],
-  });
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] });
+  const scale = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.03, 1] });
 
   return (
     <Animated.View
@@ -85,10 +84,13 @@ function FloatingBubble({
         borderRadius: size / 2,
         left,
         top,
-        backgroundColor: color,
+        backgroundColor: colors.backgroundSurfaceZ1,
+        overflow: 'hidden',
         transform: [{ translateY }, { scale }],
       }}
-    />
+    >
+      <Image source={logoSrc} style={{ width: size, height: size }} resizeMode="contain" />
+    </Animated.View>
   );
 }
 
@@ -96,232 +98,100 @@ export default function Home() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
-  const [inputFocused, setInputFocused] = useState(false);
-  const [sent, setSent] = useState<Gift[]>([]);
-  const [holdings, setHoldings] = useState<Gift[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const [inputFocused, setInputFocused] = useState(true);
 
-  useEffect(() => {
-    getDisplayName().then(setName);
-  }, []);
+  // Pick logos once on mount; locked by useMemo with [] deps
+  const logos = useMemo(() => pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)), []);
 
-  const refresh = useCallback(async () => {
-    if (!name) return;
-    setRefreshing(true);
-    const [s, h] = await Promise.all([listMyGifts(name), listMyHoldings(name)]);
-    setSent(s);
-    setHoldings(h);
-    setRefreshing(false);
-  }, [name]);
+  return (
+    <View style={[styles.root, { backgroundColor: colors.backgroundPrimary }]}>
+      {/* App bar */}
+      <View style={[styles.appBar, { paddingTop: insets.top }]}>
+        <View style={styles.appBarSlot}>
+          <Image
+            source={require('@/assets/groww-logo.png')}
+            style={styles.growwLogo}
+            resizeMode="contain"
+          />
+        </View>
+        <View style={styles.appBarSlot}>
+          <Image
+            source={require('@/assets/growwdp.png')}
+            style={styles.avatarImage}
+          />
+        </View>
+      </View>
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
-
-  // ── Name entry screen ────────────────────────────────────────────────────────
-  if (!name) {
-    return (
-      <View style={[styles.nameRoot, { backgroundColor: colors.backgroundPrimary }]}>
-        {/* App bar: Groww logo left · avatar placeholder right */}
-        <View style={[styles.appBar, { paddingTop: insets.top }]}>
-          <View style={styles.appBarSlot}>
-            <Image
-              source={require('@/assets/groww-logo.png')}
-              style={styles.growwLogo}
-              resizeMode="contain"
-            />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Hero: full-width bubble cluster + headline */}
+        <View style={styles.hero}>
+          {/* Bubble cluster spans edge-to-edge; clips overflow */}
+          <View style={[styles.cluster, { backgroundColor: colors.backgroundPrimary }]}>
+            {CIRCLES.map((c, i) => (
+              <FloatingBubble key={i} {...c} logoSrc={logos[i]} />
+            ))}
           </View>
-          <View style={styles.appBarSlot}>
-            <View style={[styles.avatarCircle, { backgroundColor: colors.backgroundTertiary }]}>
-              <Text style={[type.bodySmallHeavy, { color: colors.contentSecondary }]}>?</Text>
-            </View>
+
+          <View style={styles.heroText}>
+            <Text style={[type.displaySmall, { color: colors.contentPrimary }]}>
+              Gift a stock
+            </Text>
+            <Text style={[type.bodyBase, { color: colors.contentSecondary }]}>
+              Send a stock to someone you care about
+            </Text>
           </View>
         </View>
 
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          {/* Hero: animated bubble cluster + headline */}
-          <View style={styles.hero}>
-            <View style={styles.cluster}>
-              {CIRCLES.map((c, i) => (
-                <FloatingBubble key={i} {...c} color={colors.backgroundTertiary} />
-              ))}
-            </View>
-
-            <View style={styles.heroText}>
-              <Text style={[type.displaySmall, { color: colors.contentPrimary, textAlign: 'center' }]}>
-                Gift a stock
-              </Text>
-              <Text style={[type.bodyBase, { color: colors.contentSecondary, textAlign: 'center' }]}>
-                Send a stock to someone you care about
-              </Text>
-            </View>
-          </View>
-
-          {/* Input + CTA */}
-          <View style={[styles.inputSection, { paddingBottom: insets.bottom + spacing.l }]}>
-            <View style={styles.fieldWrap}>
-              <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>Enter your name</Text>
-              <View
-                style={[
-                  styles.textField,
-                  {
-                    borderColor: inputFocused ? colors.contentAccent : colors.borderPrimary,
-                    backgroundColor: colors.backgroundPrimary,
-                  },
-                ]}
-              >
-                <TextInput
-                  style={[type.bodyBaseHeavy, { color: colors.contentPrimary, flex: 1, padding: 0 }]}
-                  placeholder="e.g. Sagnik"
-                  placeholderTextColor={colors.contentTertiary}
-                  value={draftName}
-                  onChangeText={setDraftName}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
-                  maxLength={40}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  selectionColor={colors.contentAccent}
-                />
-              </View>
-            </View>
-            <Button
-              title="Gift a stock"
-              disabled={draftName.trim().length < 1}
-              onPress={async () => {
-                const v = draftName.trim();
-                if (!v) return;
-                await setDisplayName(v);
-                setName(v);
-                router.replace('/send');
-              }}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  // ── Home dashboard (name already set) ────────────────────────────────────────
-  return (
-    <Screen padded={false}>
-      <FlatList
-        data={sent}
-        keyExtractor={(g) => g.id}
-        contentContainerStyle={{ padding: spacing.l, gap: spacing.m }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={colors.contentAccent}
-          />
-        }
-        ListHeaderComponent={
-          <View style={{ gap: spacing.l, marginBottom: spacing.m }}>
-            <View style={styles.dashHeader}>
-              <Image
-                source={require('@/assets/groww-logo.png')}
-                style={styles.logoSmall}
-                resizeMode="contain"
+        {/* Input + CTA */}
+        <View style={[styles.inputSection, { paddingBottom: insets.bottom + spacing.l }]}>
+          <View style={styles.fieldWrap}>
+            <View
+              style={[
+                styles.textField,
+                {
+                  borderColor: inputFocused ? colors.borderNeutral : colors.borderPrimary,
+                  backgroundColor: colors.backgroundPrimary,
+                },
+              ]}
+            >
+              <TextInput
+                style={[type.bodyBaseHeavy, { color: colors.contentPrimary, flex: 1, padding: 0 }]}
+                placeholder="e.g. Sagnik"
+                placeholderTextColor={colors.contentTertiary}
+                value={draftName}
+                onChangeText={setDraftName}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                maxLength={40}
+                autoCapitalize="words"
+                autoCorrect={false}
+                selectionColor={colors.contentAccent}
+                autoFocus
               />
-              <View style={{ flex: 1 }}>
-                <Text style={[type.headingBase, { color: colors.contentPrimary }]}>
-                  Hi {name} 👋
-                </Text>
-                <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
-                  Send the gift of ownership.
-                </Text>
-              </View>
             </View>
-            <Button title="Gift a stock" onPress={() => router.push('/send')} />
-            {holdings.length > 0 && (
-              <Pressable
-                onPress={() => router.push('/holdings')}
-                style={[
-                  styles.holdingsRow,
-                  { backgroundColor: colors.backgroundAccentSubtle, borderRadius: radius.m },
-                ]}
-              >
-                <Text style={[type.bodyBaseHeavy, { color: colors.contentAccent }]}>
-                  {holdings.length} stock{holdings.length === 1 ? '' : 's'} received →
-                </Text>
-              </Pressable>
-            )}
-            <Text style={[type.headingSmall, { color: colors.contentPrimary, marginTop: spacing.l }]}>
-              Sent gifts
-            </Text>
           </View>
-        }
-        ListEmptyComponent={
-          <Text style={[type.bodyBase, { color: colors.contentSecondary }]}>
-            No gifts sent yet.
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <SentRow gift={item} onPress={() => router.push(`/send/sent?id=${item.id}`)} />
-        )}
-      />
-    </Screen>
-  );
-}
-
-function SentRow({ gift, onPress }: { gift: Gift; onPress: () => void }) {
-  const { colors } = useTheme();
-  const isClaimed = gift.status === 'claimed';
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.sentRow,
-        {
-          backgroundColor: pressed ? colors.backgroundSurfaceZ2 : colors.backgroundSurfaceZ1,
-          borderColor: colors.borderPrimary,
-          borderRadius: radius.m,
-        },
-      ]}
-    >
-      <StockAvatar symbol={gift.stock_symbol} />
-      <View style={{ flex: 1 }}>
-        <Text style={[type.bodyBaseHeavy, { color: colors.contentPrimary }]}>
-          {gift.unit === 'shares'
-            ? `${formatShares(gift.quantity)} × ${gift.stock_symbol}`
-            : `${formatINR(gift.quantity)} of ${gift.stock_symbol}`}
-        </Text>
-        <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
-          {isClaimed ? `Claimed by ${gift.receiver_name ?? '—'}` : 'Pending'}
-        </Text>
-      </View>
-      <View
-        style={{
-          paddingHorizontal: spacing.m,
-          paddingVertical: spacing.xs,
-          borderRadius: radius.pill,
-          backgroundColor: isClaimed ? colors.backgroundAccentSubtle : colors.backgroundTertiary,
-        }}
-      >
-        <Text
-          style={[
-            type.bodySmallHeavy,
-            { color: isClaimed ? colors.contentAccent : colors.contentSecondary },
-          ]}
-        >
-          {isClaimed ? 'Claimed' : 'Pending'}
-        </Text>
-      </View>
-    </Pressable>
+          <Button
+            title="Continue"
+            disabled={draftName.trim().length < 1}
+            onPress={async () => {
+              const v = draftName.trim();
+              if (!v) return;
+              await setDisplayName(v);
+              router.replace('/send');
+            }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Name-entry screen
-  nameRoot: { flex: 1 },
+  root: { flex: 1 },
   appBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -331,22 +201,25 @@ const styles = StyleSheet.create({
   },
   appBarSlot: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   growwLogo: { width: 32, height: 32 },
-  avatarCircle: {
+  avatarImage: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   hero: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.m,
+  },
+  cluster: {
+    width: '100%',
+    height: CLUSTER_H,
+    overflow: 'hidden',
+  },
+  heroText: {
+    gap: 2,
     paddingHorizontal: spacing.l,
   },
-  cluster: { width: CLUSTER_W, height: CLUSTER_H },
-  heroText: { gap: 2, alignItems: 'center' },
   inputSection: { paddingHorizontal: spacing.l, gap: spacing.m },
   fieldWrap: { gap: spacing.xs },
   textField: {
@@ -356,17 +229,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.l,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-
-  // Dashboard
-  dashHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.m },
-  logoSmall: { width: 36, height: 36 },
-  holdingsRow: { padding: spacing.m, alignItems: 'center' },
-  sentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.m,
-    padding: spacing.m,
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });

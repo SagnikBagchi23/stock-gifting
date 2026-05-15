@@ -44,6 +44,8 @@ const LOGOS: Record<string, any> = {
   ZYDUSLIFE: require('@/logos/ZYDUSLIFE.png'),
 };
 
+export const LOGO_SYMBOLS = Object.keys(LOGOS);
+
 export function getStockLogo(symbol: string): any {
   return LOGOS[symbol] ?? null;
 }

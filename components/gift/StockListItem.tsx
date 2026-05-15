@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/constants/theme';
-import { radius, spacing, type } from '@/constants/tokens';
+import { spacing, type } from '@/constants/tokens';
 import { StockAvatar } from '@/components/ui/StockAvatar';
 import type { Stock } from '@/types';
 import { formatINR } from '@/utils/format';
@@ -13,30 +13,56 @@ type Props = {
 
 export function StockListItem({ stock, onPress }: Props) {
   const { colors } = useTheme();
+  const currentValue = stock.pricePerShare * stock.sharesHeld;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        {
-          backgroundColor: pressed ? colors.backgroundSurfaceZ2 : colors.backgroundSurfaceZ1,
-          borderColor: colors.borderPrimary,
-          borderRadius: radius.m,
-        },
+        { backgroundColor: pressed ? colors.backgroundSurfaceZ1 : colors.backgroundPrimary },
       ]}
     >
-      <StockAvatar symbol={stock.symbol} />
-      <View style={styles.text}>
-        <Text style={[type.bodyLargeHeavy, { color: colors.contentPrimary }]} numberOfLines={1}>
-          {stock.symbol}
-        </Text>
-        <Text style={[type.bodySmall, { color: colors.contentSecondary }]} numberOfLines={1}>
+      {/* Avatar */}
+      <StockAvatar symbol={stock.symbol} size={40} />
+
+      {/* Middle: name + shares */}
+      <View style={styles.middle}>
+        <Text
+          style={[type.bodyBaseHeavy, { color: colors.contentPrimary }]}
+          numberOfLines={1}
+        >
           {stock.name}
         </Text>
+        <Text
+          style={[type.bodySmall, { color: colors.contentSecondary }]}
+          numberOfLines={1}
+        >
+          {stock.sharesHeld.toLocaleString('en-IN')} shares
+        </Text>
       </View>
-      <Text style={[type.bodyBaseHeavy, { color: colors.contentPrimary }]}>
-        {formatINR(stock.pricePerShare)}
-      </Text>
+
+      {/* End: current value + invested */}
+      <View style={styles.end}>
+        <Text
+          style={[type.bodyBaseHeavy, { color: colors.contentPrimary, textAlign: 'right' }]}
+          numberOfLines={1}
+        >
+          {formatINR(currentValue)}
+        </Text>
+        <Text
+          style={[type.bodySmall, { color: colors.contentSecondary, textAlign: 'right' }]}
+          numberOfLines={1}
+        >
+          {formatINR(stock.investedValue)}
+        </Text>
+      </View>
+
+      {/* Divider indented to align with text (16 pad + 40 avatar + 16 gap = 72) */}
+      <View
+        style={[styles.divider, { backgroundColor: colors.borderPrimary }]}
+        pointerEvents="none"
+      />
     </Pressable>
   );
 }
@@ -45,9 +71,25 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.m,
+    minHeight: 56,
     gap: spacing.m,
-    padding: spacing.m,
-    borderWidth: StyleSheet.hairlineWidth,
   },
-  text: { flex: 1 },
+  middle: {
+    flex: 1,
+    gap: 2,
+  },
+  end: {
+    maxWidth: 110,
+    gap: 2,
+    alignItems: 'flex-end',
+  },
+  divider: {
+    position: 'absolute',
+    bottom: 0,
+    left: 72, // 16 (padding) + 40 (avatar) + 16 (gap)
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+  },
 });

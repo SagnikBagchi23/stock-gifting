@@ -1,7 +1,9 @@
 export type Stock = {
   symbol: string;
   name: string;
-  pricePerShare: number; // mock price in INR
+  pricePerShare: number; // fallback price in INR when live fetch fails
+  sharesHeld: number;    // simulated portfolio holding for demo display
+  investedValue: number; // simulated cost basis in INR
 };
 
 export type GiftStatus = 'pending' | 'claimed';
