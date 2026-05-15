@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -18,28 +18,21 @@ import { spacing, type, radius } from '@/constants/tokens';
 import { setDisplayName } from '@/lib/identity';
 import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
-// 10 bubbles. Biggest (80px) sits near screen centre (x≈188).
-// Bottom row strictly alternates large-small so no two similar sizes touch.
-// All positions satisfy:
-//   centre-distance > sum of radii for every pair (no overlap)
-//   left+size ≤ 390, top+size ≤ 170 (no edge clip)
+// 7-bubble layout matching Figma node 1188-2205.
+// Amplitude is 20% higher than v1 for more levitation energy.
 const CIRCLES = [
-  // ── Top row: 80px anchor near centre, sizes diverge outward
-  { size: 56, left:  15, top:  5, amplitude: 5, duration: 3400, delay:    0 },
-  { size: 80, left: 148, top:  8, amplitude: 4, duration: 3200, delay:  600 }, // biggest, centre
-  { size: 44, left: 290, top: 10, amplitude: 6, duration: 3000, delay:  300 },
-  { size: 32, left: 352, top: 16, amplitude: 6, duration: 3600, delay:  900 },
-  // ── Bottom row: strict large-small alternation (60, 28, 52, 24, 48, 36)
-  { size: 60, left:  10, top: 94, amplitude: 8, duration: 3000, delay:  500 },
-  { size: 28, left:  80, top:108, amplitude: 8, duration: 2700, delay:  200 },
-  { size: 52, left: 120, top: 96, amplitude: 8, duration: 3100, delay:  800 },
-  { size: 24, left: 180, top:112, amplitude: 8, duration: 2800, delay: 1000 },
-  { size: 48, left: 212, top: 96, amplitude: 7, duration: 3300, delay:  400 },
-  { size: 36, left: 268, top:102, amplitude: 6, duration: 2600, delay:  700 },
+  { size: 64, left:  21, top:  83, amplitude:  9, duration: 3000, delay:    0 },
+  { size: 64, left: 104, top:  40, amplitude:  9, duration: 2800, delay:  600 },
+  { size: 96, left: 241, top:  90, amplitude:  6, duration: 3200, delay:  300 }, // biggest
+  { size: 56, left: 153, top: 113, amplitude: 10, duration: 2700, delay:  800 },
+  { size: 56, left: 197, top:   1, amplitude: 10, duration: 3100, delay:  400 },
+  { size: 32, left: 286, top:  40, amplitude: 12, duration: 2900, delay:  900 },
+  { size: 24, left:  63, top:  18, amplitude: 13, duration: 2600, delay:  200 },
 ] as const;
 
-const CLUSTER_H = 170;
+const CLUSTER_H = 190;
 const N_LOGOS = CIRCLES.length;
+const RESHUFFLE_MS = 5000;
 
 function pickSymbols(n: number): string[] {
   const pool = [...LOGO_SYMBOLS];
@@ -55,6 +48,8 @@ function FloatingBubble({
 }: { size: number; left: number; top: number; amplitude: number; duration: number; delay: number; logoSrc: any }) {
   const { colors } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
+  const prevSrc = useRef(logoSrc);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -78,8 +73,18 @@ function FloatingBubble({
     return () => loop.stop();
   }, []);
 
+  // Fade out → swap source → fade in when logo changes
+  useEffect(() => {
+    if (logoSrc === prevSrc.current) return;
+    prevSrc.current = logoSrc;
+    Animated.sequence([
+      Animated.timing(logoOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, [logoSrc]);
+
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] });
-  const scale = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.03, 1] });
+  const scale = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.036, 1] });
 
   return (
     <Animated.View
@@ -95,7 +100,11 @@ function FloatingBubble({
         transform: [{ translateY }, { scale }],
       }}
     >
-      <Image source={logoSrc} style={{ width: size, height: size }} resizeMode="contain" />
+      <Animated.Image
+        source={logoSrc}
+        style={{ width: size, height: size, opacity: logoOpacity }}
+        resizeMode="contain"
+      />
     </Animated.View>
   );
 }
@@ -107,8 +116,15 @@ export default function Home() {
   const [draftName, setDraftName] = useState('');
   const [inputFocused, setInputFocused] = useState(true);
 
-  // Pick logos once on mount; locked by useMemo with [] deps
-  const logos = useMemo(() => pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)), []);
+  const [logos, setLogos] = useState(() => pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)));
+
+  // Re-shuffle logos every 5 s so the cluster feels alive
+  useEffect(() => {
+    const id = setInterval(() => {
+      setLogos(pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)));
+    }, RESHUFFLE_MS);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.backgroundPrimary }]}>
@@ -135,7 +151,6 @@ export default function Home() {
       >
         {/* Hero: full-width bubble cluster + headline */}
         <View style={styles.hero}>
-          {/* Bubble cluster spans edge-to-edge; clips overflow */}
           <View style={[styles.cluster, { backgroundColor: colors.backgroundPrimary }]}>
             {CIRCLES.map((c, i) => (
               <FloatingBubble key={i} {...c} logoSrc={logos[i]} />
@@ -216,9 +231,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     gap: spacing.m,
-    // Vertical padding keeps the cluster container from touching the app bar
-    // above or the input section below — bubbles can't escape overflow:hidden,
-    // but the cluster view itself needs room.
     paddingTop: spacing.l,
     paddingBottom: spacing.m,
   },
