@@ -72,9 +72,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.l,
-    paddingVertical: spacing.m,
-    minHeight: 56,
-    gap: spacing.m,
+    paddingVertical: spacing.l,
+    gap: spacing.l,
   },
   middle: {
     flex: 1,

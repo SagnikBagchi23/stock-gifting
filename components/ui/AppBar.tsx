@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/constants/theme';
 import { spacing, type } from '@/constants/tokens';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,7 @@ export function AppBar({ title, showBack, right }: Props) {
       <View style={styles.side}>
         {showBack && (
           <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Text style={[type.bodyLargeHeavy, { color: colors.contentPrimary }]}>‹</Text>
+            <Feather name="arrow-left" size={24} color={colors.contentPrimary} />
           </Pressable>
         )}
       </View>
@@ -32,7 +33,7 @@ export function AppBar({ title, showBack, right }: Props) {
 
 const styles = StyleSheet.create({
   bar: {
-    height: 48,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

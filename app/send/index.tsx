@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/ui/Screen';
@@ -7,7 +8,7 @@ import { AppBar } from '@/components/ui/AppBar';
 import { StockListItem } from '@/components/gift/StockListItem';
 import { STOCKS } from '@/data/stocks';
 import { fetchLivePrices } from '@/lib/prices';
-import { spacing, type } from '@/constants/tokens';
+import { radius, spacing, type } from '@/constants/tokens';
 import { useTheme } from '@/constants/theme';
 
 export default function PickStock() {
@@ -15,6 +16,7 @@ export default function PickStock() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(true);
 
@@ -44,28 +46,38 @@ export default function PickStock() {
     <Screen padded={false}>
       <AppBar title="Pick a stock" showBack />
 
-      {/* Sticky pill search bar — keyboard overlays the list, no KAV */}
+      {/* Search input — styled like the welcome screen's text field */}
       <View style={[styles.searchContainer, { paddingHorizontal: spacing.l, paddingBottom: spacing.s }]}>
-        <View style={[styles.searchPill, { backgroundColor: colors.backgroundSurfaceZ1 }]}>
-          <Text style={[styles.searchIcon, { color: colors.contentTertiary }]}>⌕</Text>
+        <View
+          style={[
+            styles.searchField,
+            {
+              borderColor: searchFocused ? colors.borderNeutral : colors.borderPrimary,
+              backgroundColor: colors.backgroundPrimary,
+            },
+          ]}
+        >
+          <Feather name="search" size={20} color={colors.contentTertiary} />
           <TextInput
             style={[type.bodyBase, styles.searchInput, { color: colors.contentPrimary }]}
             placeholder="Search here..."
             placeholderTextColor={colors.contentTertiary}
             value={q}
             onChangeText={setQ}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
             selectionColor={colors.contentAccent}
           />
           {q.length > 0 && (
-            <Text
+            <Feather
+              name="x"
+              size={18}
+              color={colors.contentTertiary}
               onPress={() => setQ('')}
-              style={[styles.clearBtn, { color: colors.contentTertiary }]}
-            >
-              ✕
-            </Text>
+            />
           )}
         </View>
       </View>
@@ -100,27 +112,20 @@ export default function PickStock() {
 
 const styles = StyleSheet.create({
   searchContainer: {
-    paddingTop: spacing.s,
+    paddingTop: spacing.m,
   },
-  searchPill: {
-    height: 48,
-    borderRadius: 24,
+  searchField: {
+    height: 56,
+    borderRadius: radius.l,
+    borderWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.m,
-    gap: spacing.xs,
-  },
-  searchIcon: {
-    fontSize: 20,
-    lineHeight: 24,
+    gap: spacing.s,
   },
   searchInput: {
     flex: 1,
     padding: 0,
-  },
-  clearBtn: {
-    fontSize: 14,
-    paddingHorizontal: spacing.xs,
   },
   empty: {
     alignItems: 'center',
