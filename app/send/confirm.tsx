@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import Animated, {
   Easing,
   interpolate,
@@ -21,7 +22,6 @@ import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
 import { AppBar } from '@/components/ui/AppBar';
-import { Button } from '@/components/ui/Button';
 import { findStock } from '@/data/stocks';
 import { getStockLogo } from '@/data/stockLogos';
 import { spacing, radius, fonts } from '@/constants/tokens';
@@ -45,8 +45,8 @@ const SWATCH_SIZE = 40;
 const MAX_TILT = 17; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
-const FADE_MS = 380;
-const BLUR_PEAK = 60;
+const FADE_MS = 700;
+const BLUR_PEAK = 35;
 
 export default function PreviewGift() {
   const { symbol, amount, unit, message } = useLocalSearchParams<{
@@ -78,6 +78,60 @@ export default function PreviewGift() {
   const floatY = useSharedValue(0);
   const tiltX = useSharedValue(0);
   const tiltY = useSharedValue(0);
+
+  // ── Shareable URL (computed once, shown as QR + copy text) ────────────────
+  // Two-layer URL strategy:
+  //   exp://       → raw Expo deep link (works in QR scanners, opens Expo Go)
+  //   https://     → tappable wrapper (works in iMessage/WhatsApp/etc., opens Expo Go)
+  // The https wrapper requires a public host (Cloudflare Tunnel in dev,
+  // an EAS Update channel in prod). We surface the tappable URL as the
+  // primary share artifact.
+  const shareUrl = useMemo(() => {
+    const tunnelHost = process.env.EXPO_PUBLIC_TUNNEL_HOST;
+    const lanHost = Constants.expoGoConfig?.debuggerHost;
+    const host = tunnelHost ?? lanHost;
+    const qs = [
+      `amount=${encodeURIComponent(amount ?? '')}`,
+      `unit=${encodeURIComponent(unit ?? '')}`,
+      `message=${encodeURIComponent(message ?? '')}`,
+      `gradient=${activeGradient}`,
+    ].join('&');
+    if (!host) {
+      return Linking.createURL(`/receive/${symbol}`, {
+        queryParams: {
+          amount: amount ?? '',
+          unit: unit ?? '',
+          message: message ?? '',
+          gradient: String(activeGradient),
+        },
+      });
+    }
+    // Strip protocol if user wrote https://… in env
+    const cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const expUrl = `exp://${cleanHost}/--/receive/${symbol}?${qs}`;
+    // expo.dev/--/to-exp/<encoded> turns any exp:// URL into a tappable https link
+    return `https://expo.dev/--/to-exp/${encodeURIComponent(expUrl)}`;
+  }, [activeGradient, amount, message, symbol, unit]);
+
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(async () => {
+    await Clipboard.setStringAsync(shareUrl);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }, [shareUrl]);
+
+  const handleShare = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Share.share({
+        message: `You've got a stock gift! Tap to open: ${shareUrl}`,
+        url: shareUrl,
+      });
+    } catch {
+      // user cancelled — no-op
+    }
+  }, [shareUrl]);
 
   // ── Mount enter animation ─────────────────────────────────────────────────
   useEffect(() => {
@@ -154,13 +208,13 @@ export default function PreviewGift() {
 
       // Blur ramps up to peak at the crossover midpoint, then dissolves
       blurIntensity.value = withSequence(
-        withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: Easing.out(Easing.quad) }),
-        withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.in(Easing.quad) })
+        withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) })
       );
 
       fadeProgress.value = withTiming(
         1,
-        { duration: FADE_MS, easing: Easing.out(Easing.quad) },
+        { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) },
         (finished) => {
           if (finished) {
             runOnJS(setLayerA)(index);
@@ -285,37 +339,27 @@ export default function PreviewGift() {
         </View>
       </View>
 
-      {/* Docked CTA */}
+      {/* Docked share section */}
       <View style={[styles.cta, { paddingBottom: spacing.l }]}>
-        <Button
-          title="Share link"
-          onPress={() => {
-            // Constants.expoGoConfig.debuggerHost is the tunnel host when
-            // `expo start --tunnel` is running (e.g. "abc123.exp.direct:80").
-            // Using it directly guarantees the exp:// URL is publicly reachable.
-            // Fall back to Linking.createURL for same-network / production cases.
-            const host = Constants.expoGoConfig?.debuggerHost;
-            const qs = [
-              `amount=${encodeURIComponent(amount ?? '')}`,
-              `unit=${encodeURIComponent(unit ?? '')}`,
-              `message=${encodeURIComponent(message ?? '')}`,
-              `gradient=${activeGradient}`,
-            ].join('&');
-            const expUrl = host
-              ? `exp://${host}/--/receive/${symbol}?${qs}`
-              : Linking.createURL(`/receive/${symbol}`, {
-                  queryParams: {
-                    amount: amount ?? '',
-                    unit: unit ?? '',
-                    message: message ?? '',
-                    gradient: String(activeGradient),
-                  },
-                });
-            // exp:// is Expo Go's registered custom URL scheme.
-            // iMessage on iOS renders it as a tappable link when Expo Go is installed.
-            Share.share({ url: expUrl, message: expUrl });
-          }}
-        />
+        <Pressable
+          onPress={handleShare}
+          style={({ pressed }) => [styles.shareBtn, pressed && styles.shareBtnPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Share gift link"
+        >
+          <Text style={styles.shareBtnText}>Share gift link</Text>
+        </Pressable>
+        <Pressable
+          onPress={handleCopy}
+          style={styles.copyRow}
+          accessibilityRole="button"
+          accessibilityLabel="Copy link"
+        >
+          <Text style={styles.copyRowText} numberOfLines={1} ellipsizeMode="middle">
+            {shareUrl}
+          </Text>
+          <Text style={styles.copyRowAction}>{copied ? 'Copied' : 'Copy'}</Text>
+        </Pressable>
       </View>
     </Screen>
   );
@@ -394,5 +438,45 @@ const styles = StyleSheet.create({
   cta: {
     paddingHorizontal: spacing.l,
     paddingTop: spacing.s,
+    gap: spacing.m,
+  },
+  shareBtn: {
+    height: 56,
+    borderRadius: radius.l,
+    backgroundColor: '#04B488',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareBtnPressed: {
+    opacity: 0.85,
+  },
+  shareBtnText: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#FFFFFF',
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.m,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: radius.m,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  copyRowText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 16,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  copyRowAction: {
+    fontFamily: fonts.heading,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#04B488',
   },
 });

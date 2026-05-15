@@ -319,6 +319,6 @@ const styles = StyleSheet.create({
   buttonWrap: {
     paddingHorizontal: spacing.l,
     paddingTop: spacing.m,
-    paddingBottom: spacing.s,
+    paddingBottom: spacing.l,
   },
 });

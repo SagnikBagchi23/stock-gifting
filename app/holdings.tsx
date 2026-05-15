@@ -10,6 +10,20 @@ import { getDisplayName } from '@/lib/identity';
 import { formatINR, formatShares } from '@/utils/format';
 import type { Gift } from '@/types';
 
+// Deterministic simulated P&L: ~40% of holdings show a loss, ~60% show a gain.
+// Uses a string hash of the gift ID so the result is stable across renders.
+function simulatedCurrentValue(gift: Gift): number {
+  let hash = 0;
+  for (let i = 0; i < gift.id.length; i++) {
+    hash = ((hash << 5) - hash + gift.id.charCodeAt(i)) | 0;
+  }
+  const n = ((hash & 0x7fffffff) % 1000) / 1000; // 0..1
+  const multiplier = n < 0.4
+    ? 1 - 0.05 - n * 0.375   // loss: -5% to -20%
+    : 1 + 0.02 + (n - 0.4) * 0.383; // gain: +2% to +25%
+  return Math.round(gift.total_value * multiplier * 100) / 100;
+}
+
 export default function Holdings() {
   const { colors } = useTheme();
   const [name, setName] = useState<string | null>(null);
@@ -29,7 +43,7 @@ export default function Holdings() {
     });
   }, [refresh]);
 
-  const total = items.reduce((acc, g) => acc + Number(g.total_value || 0), 0);
+  const total = items.reduce((acc, g) => acc + simulatedCurrentValue(g), 0);
 
   return (
     <Screen padded={false}>
@@ -72,7 +86,10 @@ export default function Holdings() {
             No stocks yet. Ask a friend to gift you one!
           </Text>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const currentValue = simulatedCurrentValue(item);
+          const isLoss = currentValue < item.total_value;
+          return (
           <View
             style={[
               styles.row,
@@ -96,11 +113,12 @@ export default function Holdings() {
                 {item.sender_name}
               </Text>
             </View>
-            <Text style={[type.bodyBaseHeavy, { color: colors.contentPrimary }]}>
-              {formatINR(item.total_value)}
+            <Text style={[type.bodyBaseHeavy, { color: isLoss ? colors.contentNegative : colors.contentPrimary }]}>
+              {formatINR(currentValue)}
             </Text>
           </View>
-        )}
+        );
+        }}
       />
     </Screen>
   );
