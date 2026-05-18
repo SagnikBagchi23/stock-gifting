@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -45,7 +45,7 @@ const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
 const SWATCH_SIZE = 40;
-const MAX_TILT = 17; // degrees
+const MAX_TILT = 22; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
 const FADE_MS = 700;
@@ -179,31 +179,42 @@ export default function PreviewGift() {
 
     DeviceMotion.isAvailableAsync().then((ok) => {
       if (!ok) return;
-      DeviceMotion.setUpdateInterval(50);
+      DeviceMotion.setUpdateInterval(16); // ~60Hz, snappier than 20Hz
       sub = DeviceMotion.addListener(({ rotation }) => {
         if (!rotation) return;
         // DeviceMotion.rotation values are in RADIANS.
         // beta = X-axis tilt (pitch), gamma = Y-axis tilt (roll).
         if (initialBeta.current === null) initialBeta.current = rotation.beta;
         const RAD2DEG = 180 / Math.PI;
-        const pitchDeg = (rotation.beta - initialBeta.current) * RAD2DEG;
-        const rollDeg = rotation.gamma * RAD2DEG;
+        const GAIN = 2.2; // amplify small tilts so the effect is obvious
+        const pitchDeg = (rotation.beta - initialBeta.current) * RAD2DEG * GAIN;
+        const rollDeg = rotation.gamma * RAD2DEG * GAIN;
         const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDeg));
         const ty = Math.max(-MAX_TILT, Math.min(MAX_TILT, rollDeg));
-        tiltX.value = withSpring(tx, { damping: 22, stiffness: 160 });
-        tiltY.value = withSpring(ty, { damping: 22, stiffness: 160 });
+        tiltX.value = withSpring(tx, { damping: 14, stiffness: 220, mass: 0.6 });
+        tiltY.value = withSpring(ty, { damping: 14, stiffness: 220, mass: 0.6 });
       });
     });
 
     return () => sub?.remove();
   }, []);
 
-  // ── Unlock fade (called from UI thread via runOnJS) ───────────────────────
-  const unlockFade = useCallback(() => {
-    fadeLocked.current = false;
-  }, []);
-
   // ── Gradient swap with cross-fade ─────────────────────────────────────────
+  // Pending commit: after the fade completes we need to swap layerA's source
+  // to the new gradient. We can't reset fadeProgress in the worklet callback
+  // because React hasn't committed the new <ImageBackground source={...}> yet,
+  // so the old layerA would flash for one frame. Instead we store the pending
+  // index, let React commit it (useLayoutEffect), then reset fadeProgress.
+  const [pendingCommit, setPendingCommit] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (pendingCommit === null) return;
+    // layerA has been re-rendered with the new source — safe to flip opacity back.
+    fadeProgress.value = 0;
+    setPendingCommit(null);
+    fadeLocked.current = false;
+  }, [pendingCommit]);
+
   const handleSwatchPress = useCallback(
     (index: number) => {
       if (fadeLocked.current || index === activeGradient) return;
@@ -224,15 +235,15 @@ export default function PreviewGift() {
         { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) },
         (finished) => {
           if (finished) {
+            // Hand off to JS — the layout effect resets fadeProgress AFTER
+            // React commits the new layerA source, eliminating the flicker.
             runOnJS(setLayerA)(index);
-            runOnJS(setLayerB)(index);
-            fadeProgress.value = 0;
-            runOnJS(unlockFade)();
+            runOnJS(setPendingCommit)(index);
           }
         }
       );
     },
-    [activeGradient, unlockFade]
+    [activeGradient]
   );
 
   // ── Animated styles ───────────────────────────────────────────────────────

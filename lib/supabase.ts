@@ -38,11 +38,18 @@ if (typeof globalThis.WebSocket === 'undefined' && typeof process !== 'undefined
   }
 }
 
-export const supabase = createClient(url ?? '', anon ?? '', {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
+// Use a syntactically-valid placeholder URL when env vars are missing so
+// `new URL(url)` inside supabase-js doesn't throw at module-import time
+// (which would crash any screen that imports this file).
+export const supabase = createClient(
+  url || 'https://placeholder.invalid',
+  anon || 'placeholder',
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
   },
-});
+);
