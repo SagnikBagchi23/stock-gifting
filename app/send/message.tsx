@@ -92,7 +92,7 @@ export default function WriteMessage() {
           </View>
         </View>
 
-        <View style={[styles.cta, { paddingBottom: spacing.l }]}>
+        <View style={[styles.cta, { paddingBottom: 16, marginBottom: -insets.bottom }]}>
           <Button
             title="Continue"
             disabled={!canContinue}

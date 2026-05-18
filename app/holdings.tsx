@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/ui/Screen';
 import { AppBar } from '@/components/ui/AppBar';
 import { StockAvatar } from '@/components/ui/StockAvatar';
@@ -29,6 +29,7 @@ export default function Holdings() {
   const [name, setName] = useState<string | null>(null);
   const [items, setItems] = useState<Gift[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const refresh = useCallback(async (n: string) => {
     setRefreshing(true);
@@ -47,11 +48,15 @@ export default function Holdings() {
 
   return (
     <Screen padded={false}>
-      <AppBar title="My holdings" showBack />
-      <FlatList
+      <AppBar title="My holdings" showBack scrollY={scrollY} />
+      <Animated.FlatList
         data={items}
-        keyExtractor={(g) => g.id}
+        keyExtractor={(g: Gift) => g.id}
         contentContainerStyle={{ padding: spacing.l, gap: spacing.s }}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

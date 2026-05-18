@@ -12,24 +12,45 @@ type Props = {
   leftTitle?: boolean;
   showBack?: boolean;
   right?: React.ReactNode;
-  /** Animated or static style overrides for the bar container (e.g. animated bg) */
-  animatedStyle?: Animated.WithAnimatedValue<object>;
+  /**
+   * Scroll position driver. When provided, the bar fades from
+   * (backgroundPrimary, no border) at the top to
+   * (backgroundSurfaceZ1, borderPrimary) once content overflows.
+   */
+  scrollY?: Animated.Value;
+  /** Override the resting background color (e.g. for tinted screens). */
+  bgColor?: string;
 };
 
-export function AppBar({ title, subtitle, leftTitle, showBack, right, animatedStyle }: Props) {
+export function AppBar({ title, subtitle, leftTitle, showBack, right, scrollY, bgColor }: Props) {
   const { colors } = useTheme();
   const router = useRouter();
 
   const withSubtitle = !!subtitle;
   const isLeftAligned = withSubtitle || !!leftTitle;
 
+  const restingBg = bgColor ?? colors.backgroundPrimary;
+  const bg = scrollY
+    ? scrollY.interpolate({
+        inputRange: [0, 8],
+        outputRange: [restingBg, colors.backgroundSurfaceZ1],
+        extrapolate: 'clamp',
+      })
+    : restingBg;
+  const border = scrollY
+    ? scrollY.interpolate({
+        inputRange: [0, 8],
+        outputRange: ['transparent', colors.borderPrimary],
+        extrapolate: 'clamp',
+      })
+    : 'transparent';
+
   return (
     <Animated.View
       style={[
         styles.bar,
-        { borderBottomColor: colors.borderPrimary, backgroundColor: colors.backgroundPrimary },
+        { backgroundColor: bg, borderBottomColor: border },
         withSubtitle && styles.barTall,
-        animatedStyle,
       ]}
     >
       <View style={styles.side}>

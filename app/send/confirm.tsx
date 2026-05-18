@@ -192,11 +192,13 @@ export default function PreviewGift() {
       DeviceMotion.setUpdateInterval(50);
       sub = DeviceMotion.addListener(({ rotation }) => {
         if (!rotation) return;
-        // rotation.beta: X-axis tilt (pitch), rotation.gamma: Y-axis tilt (roll) — in degrees
+        // DeviceMotion.rotation values are in RADIANS.
+        // beta = X-axis tilt (pitch), gamma = Y-axis tilt (roll).
         if (initialBeta.current === null) initialBeta.current = rotation.beta;
-        const pitchDelta = rotation.beta - initialBeta.current;
-        const rollDeg = rotation.gamma;
-        const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDelta));
+        const RAD2DEG = 180 / Math.PI;
+        const pitchDeg = (rotation.beta - initialBeta.current) * RAD2DEG;
+        const rollDeg = rotation.gamma * RAD2DEG;
+        const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDeg));
         const ty = Math.max(-MAX_TILT, Math.min(MAX_TILT, rollDeg));
         tiltX.value = withSpring(tx, { damping: 22, stiffness: 160 });
         tiltY.value = withSpring(ty, { damping: 22, stiffness: 160 });
@@ -277,7 +279,7 @@ export default function PreviewGift() {
         title="Preview"
         showBack
         leftTitle
-        animatedStyle={{ backgroundColor: '#060809', borderBottomWidth: 0 }}
+        bgColor="#060809"
       />
 
       <View style={styles.body}>

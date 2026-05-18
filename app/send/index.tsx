@@ -45,17 +45,7 @@ export default function PickStock() {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
-  // Animated AppBar bg + border for scroll-aware state
-  const appBarBg = scrollY.interpolate({
-    inputRange: [0, 8],
-    outputRange: [colors.backgroundPrimary, colors.backgroundSurfaceZ1],
-    extrapolate: 'clamp',
-  });
-  const appBarBorder = scrollY.interpolate({
-    inputRange: [0, 8],
-    outputRange: ['transparent', colors.borderPrimary],
-    extrapolate: 'clamp',
-  });
+  // AppBar handles its own scroll-aware bg/border via the scrollY prop.
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -137,7 +127,7 @@ export default function PickStock() {
         title="Pick a stock"
         showBack
         leftTitle
-        animatedStyle={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
+        scrollY={scrollY}
       />
 
       <Animated.FlatList
