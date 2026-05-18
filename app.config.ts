@@ -3,7 +3,12 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'Groww Gift',
   slug: 'stock-gifting',
+  owner: 'growwdesign',
   version: '1.0.0',
+  runtimeVersion: 'exposdk:54.0.0',
+  updates: {
+    url: 'https://u.expo.dev/3e962d09-1429-4ef5-a5ca-ffaeb85c4723',
+  },
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: 'stockgifting',
@@ -37,6 +42,9 @@ const config: ExpoConfig = {
   extra: {
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    eas: {
+      projectId: '3e962d09-1429-4ef5-a5ca-ffaeb85c4723',
+    },
   },
 };
 

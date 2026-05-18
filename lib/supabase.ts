@@ -24,6 +24,20 @@ if (!url || !anon) {
   console.error('[supabase] Missing SUPABASE_URL / SUPABASE_ANON_KEY in app config extra.');
 }
 
+// Web SSR (Node 20) has no global WebSocket; supabase-js realtime checks for
+// it at construction time and throws. Polyfill before createClient runs.
+// Hide the require from Metro's static analyzer so `ws` (and its Node `stream`
+// dep) never get pulled into the React Native bundle.
+if (typeof globalThis.WebSocket === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodeRequire = (0, eval)('require') as NodeRequire;
+    (globalThis as unknown as { WebSocket: unknown }).WebSocket = nodeRequire('ws');
+  } catch {
+    // realtime won't work here, but createClient will still succeed
+  }
+}
+
 export const supabase = createClient(url ?? '', anon ?? '', {
   auth: {
     storage: AsyncStorage,

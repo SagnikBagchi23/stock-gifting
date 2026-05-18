@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A0A0B" />
+  <title>Opening Expo Go…</title>
+  <meta name="description" content="Opening your gift in Expo Go." />
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    :root{
+      --bg:#0A0A0B; --surface:#111114; --border:#1f1f25;
+      --text:#F5F5F7; --muted:#9b9ba3;
+      --font:ui-sans-serif,system-ui,-apple-system,"Inter","SF Pro Text","Segoe UI",Roboto,sans-serif;
+      --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    }
+    body{
+      background:var(--bg); color:var(--text); font-family:var(--font);
+      min-height:100dvh; -webkit-font-smoothing:antialiased; line-height:1.5;
+      display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .card{
+      max-width:420px; width:100%; background:var(--surface); border:1px solid var(--border);
+      border-radius:16px; padding:28px; text-align:center;
+    }
+    .spinner{
+      width:32px; height:32px; border-radius:50%; margin:0 auto 20px;
+      border:3px solid rgba(255,255,255,.1); border-top-color:#22c55e;
+      animation:spin 0.9s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    h1{font-size:18px; font-weight:600; letter-spacing:-0.01em; margin:0 0 8px}
+    p{color:var(--muted); font-size:14px; margin:0 0 20px}
+    .fallback{margin-top:24px; padding-top:20px; border-top:1px solid var(--border)}
+    .fallback p{margin:0 0 12px; font-size:13px}
+    .btn{
+      display:inline-block; padding:10px 18px; border-radius:10px;
+      background:rgba(255,255,255,.08); border:1px solid var(--border);
+      color:var(--text); text-decoration:none; font-size:13px; font-weight:500;
+    }
+    .url{
+      font-family:var(--mono); font-size:11px; color:var(--muted);
+      word-break:break-all; margin-top:12px; line-height:1.4;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>Opening Expo Go…</h1>
+    <p>You're being redirected to your gift.</p>
+    <div class="fallback">
+      <p>Didn't open?</p>
+      <a class="btn" id="manual" href="#">Tap to open</a>
+      <a class="btn" href="https://expo.dev/go" target="_blank" rel="noopener" style="margin-left:8px">Install Expo Go</a>
+      <div class="url" id="url-preview"></div>
+    </div>
+  </main>
+  <script>
+    (function(){
+      function getParam(name){
+        var m = new RegExp('[?&]' + name + '=([^&]+)').exec(window.location.search);
+        return m ? decodeURIComponent(m[1]) : null;
+      }
+      var target = getParam('u');
+      if (!target || target.indexOf('exp://') !== 0) {
+        document.querySelector('h1').textContent = 'Invalid link';
+        document.querySelector('p').textContent = 'This gift link is missing or malformed.';
+        document.querySelector('.spinner').style.display = 'none';
+        return;
+      }
+      var manual = document.getElementById('manual');
+      manual.setAttribute('href', target);
+      document.getElementById('url-preview').textContent = target;
+      // Kick off the redirect on next tick so the page paints first.
+      setTimeout(function(){ window.location.replace(target); }, 50);
+    })();
+  </script>
+</body>
+</html>

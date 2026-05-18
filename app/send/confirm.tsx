@@ -16,8 +16,6 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
-import Constants from 'expo-constants';
 import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
@@ -26,6 +24,12 @@ import { findStock } from '@/data/stocks';
 import { getStockLogo } from '@/data/stockLogos';
 import { spacing, radius, fonts } from '@/constants/tokens';
 import { formatINR } from '@/utils/format';
+import { createGift } from '@/lib/gifts';
+import { getDisplayName } from '@/lib/identity';
+
+const EAS_PROJECT_ID = '3e962d09-1429-4ef5-a5ca-ffaeb85c4723';
+const EAS_CHANNEL = 'preview';
+const REDIRECT_ORIGIN = 'https://stock-gifting.vercel.app';
 
 // Metro bundler requires literal require() paths
 const GRADIENTS = [
@@ -49,7 +53,7 @@ const FADE_MS = 700;
 const BLUR_PEAK = 35;
 
 export default function PreviewGift() {
-  const { symbol, amount, unit, message } = useLocalSearchParams<{
+  const { symbol, amount, unit, message, price } = useLocalSearchParams<{
     symbol: string;
     amount: string;
     unit: string;
@@ -79,42 +83,52 @@ export default function PreviewGift() {
   const tiltX = useSharedValue(0);
   const tiltY = useSharedValue(0);
 
-  // ── Shareable URL (computed once, shown as QR + copy text) ────────────────
-  // Two-layer URL strategy:
-  //   exp://       → raw Expo deep link (works in QR scanners, opens Expo Go)
-  //   https://     → tappable wrapper (works in iMessage/WhatsApp/etc., opens Expo Go)
-  // The https wrapper requires a public host (Cloudflare Tunnel in dev,
-  // an EAS Update channel in prod). We surface the tappable URL as the
-  // primary share artifact.
-  const shareUrl = useMemo(() => {
-    const tunnelHost = process.env.EXPO_PUBLIC_TUNNEL_HOST;
-    const lanHost = Constants.expoGoConfig?.debuggerHost;
-    const host = tunnelHost ?? lanHost;
-    const qs = [
-      `amount=${encodeURIComponent(amount ?? '')}`,
-      `unit=${encodeURIComponent(unit ?? '')}`,
-      `message=${encodeURIComponent(message ?? '')}`,
-      `gradient=${activeGradient}`,
-    ].join('&');
-    if (!host) {
-      return Linking.createURL(`/receive/${symbol}`, {
-        queryParams: {
-          amount: amount ?? '',
-          unit: unit ?? '',
-          message: message ?? '',
-          gradient: String(activeGradient),
-        },
+  // Shareable URL — created lazily after we've inserted a real Supabase gift row.
+  // Recipients tap the https link → tiny static redirect on our Vercel domain
+  // → exp:// link → Expo Go opens → loads the `preview` channel bundle
+  // → deep-links into /gift/<id> → existing claim screen writes receiver name
+  // to Supabase → /holdings (which reads from Supabase) shows the new stock.
+  const [giftId, setGiftId] = useState<string | null>(null);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const creatingRef = useRef(false);
+
+  useEffect(() => {
+    if (creatingRef.current) return;
+    if (!symbol || !amount || !unit) return;
+    const qty = parseFloat(amount);
+    if (!Number.isFinite(qty) || qty <= 0) return;
+    if (unit !== 'shares' && unit !== 'rupees') return;
+    creatingRef.current = true;
+    (async () => {
+      const senderName = (await getDisplayName()) ?? 'A friend';
+      const pricePerShare = price ? parseFloat(price) : undefined;
+      const res = await createGift({
+        senderName,
+        stockSymbol: symbol,
+        unit,
+        quantity: qty,
+        pricePerShare:
+          pricePerShare && Number.isFinite(pricePerShare) ? pricePerShare : undefined,
+        note: message,
       });
-    }
-    // Strip protocol if user wrote https://… in env
-    const cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const expUrl = `exp://${cleanHost}/--/receive/${symbol}?${qs}`;
-    // expo.dev/--/to-exp/<encoded> turns any exp:// URL into a tappable https link
-    return `https://expo.dev/--/to-exp/${encodeURIComponent(expUrl)}`;
-  }, [activeGradient, amount, message, symbol, unit]);
+      if ('id' in res) {
+        setGiftId(res.id);
+      } else {
+        setGiftError(res.error);
+        creatingRef.current = false;
+      }
+    })();
+  }, [symbol, amount, unit, price, message]);
+
+  const shareUrl = useMemo(() => {
+    if (!giftId) return '';
+    const expUrl = `exp://u.expo.dev/${EAS_PROJECT_ID}/--/gift/${giftId}?channel-name=${EAS_CHANNEL}`;
+    return `${REDIRECT_ORIGIN}/open.html?u=${encodeURIComponent(expUrl)}`;
+  }, [giftId]);
 
   const [copied, setCopied] = useState(false);
   const handleCopy = useCallback(async () => {
+    if (!shareUrl) return;
     await Clipboard.setStringAsync(shareUrl);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
@@ -122,6 +136,7 @@ export default function PreviewGift() {
   }, [shareUrl]);
 
   const handleShare = useCallback(async () => {
+    if (!shareUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
@@ -343,20 +358,28 @@ export default function PreviewGift() {
       <View style={[styles.cta, { paddingBottom: spacing.l }]}>
         <Pressable
           onPress={handleShare}
-          style={({ pressed }) => [styles.shareBtn, pressed && styles.shareBtnPressed]}
+          disabled={!shareUrl}
+          style={({ pressed }) => [
+            styles.shareBtn,
+            !shareUrl && styles.shareBtnDisabled,
+            pressed && styles.shareBtnPressed,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Share gift link"
         >
-          <Text style={styles.shareBtnText}>Share gift link</Text>
+          <Text style={styles.shareBtnText}>
+            {giftError ? 'Try again' : shareUrl ? 'Share gift link' : 'Preparing link…'}
+          </Text>
         </Pressable>
         <Pressable
           onPress={handleCopy}
+          disabled={!shareUrl}
           style={styles.copyRow}
           accessibilityRole="button"
           accessibilityLabel="Copy link"
         >
           <Text style={styles.copyRowText} numberOfLines={1} ellipsizeMode="middle">
-            {shareUrl}
+            {shareUrl || (giftError ?? 'Generating shareable link…')}
           </Text>
           <Text style={styles.copyRowAction}>{copied ? 'Copied' : 'Copy'}</Text>
         </Pressable>
@@ -449,6 +472,9 @@ const styles = StyleSheet.create({
   },
   shareBtnPressed: {
     opacity: 0.85,
+  },
+  shareBtnDisabled: {
+    opacity: 0.5,
   },
   shareBtnText: {
     fontFamily: fonts.heading,
