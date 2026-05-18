@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import Animated, {
   Easing,
   interpolate,
@@ -125,15 +124,6 @@ export default function PreviewGift() {
     const expUrl = `exp://u.expo.dev/${EAS_PROJECT_ID}/--/gift/${giftId}?channel-name=${EAS_CHANNEL}`;
     return `${REDIRECT_ORIGIN}/open.html?u=${encodeURIComponent(expUrl)}`;
   }, [giftId]);
-
-  const [copied, setCopied] = useState(false);
-  const handleCopy = useCallback(async () => {
-    if (!shareUrl) return;
-    await Clipboard.setStringAsync(shareUrl);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
-  }, [shareUrl]);
 
   const handleShare = useCallback(async () => {
     if (!shareUrl) return;
@@ -373,18 +363,6 @@ export default function PreviewGift() {
             {giftError ? 'Try again' : shareUrl ? 'Share gift link' : 'Preparing link…'}
           </Text>
         </Pressable>
-        <Pressable
-          onPress={handleCopy}
-          disabled={!shareUrl}
-          style={styles.copyRow}
-          accessibilityRole="button"
-          accessibilityLabel="Copy link"
-        >
-          <Text style={styles.copyRowText} numberOfLines={1} ellipsizeMode="middle">
-            {shareUrl || (giftError ?? 'Generating shareable link…')}
-          </Text>
-          <Text style={styles.copyRowAction}>{copied ? 'Copied' : 'Copy'}</Text>
-        </Pressable>
       </View>
     </Screen>
   );
@@ -483,28 +461,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     color: '#FFFFFF',
-  },
-  copyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.m,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: radius.m,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  copyRowText: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    lineHeight: 16,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  copyRowAction: {
-    fontFamily: fonts.heading,
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#04B488',
   },
 });
