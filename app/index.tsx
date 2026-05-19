@@ -14,9 +14,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/constants/theme';
-import { spacing, type, radius } from '@/constants/tokens';
+import { spacing, type, radius, fonts } from '@/constants/tokens';
 import { setDisplayName } from '@/lib/identity';
-import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
+import { getStockLogo } from '@/data/stockLogos';
 
 // 7-bubble layout matching Figma node 1188-2205.
 // Amplitude is 20% higher than v1 for more levitation energy.
@@ -24,37 +24,22 @@ import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 // centered on screen, so layout is screen-width-independent.
 const CLUSTER_W = 320;
 const CIRCLES = [
-  { size: 64, left:   6, top:  80, amplitude:  9, duration: 3000, delay:    0 },
-  { size: 64, left:  88, top:  35, amplitude:  9, duration: 2800, delay:  600 },
-  { size: 64, left: 192, top:  78, amplitude:  6, duration: 3200, delay:  300 },
-  { size: 56, left: 130, top: 122, amplitude: 10, duration: 2700, delay:  800 },
-  { size: 56, left: 244, top:  18, amplitude: 10, duration: 3100, delay:  400 },
-  { size: 32, left: 268, top: 118, amplitude: 12, duration: 2900, delay:  900 },
-  { size: 24, left:  50, top:  12, amplitude: 13, duration: 2600, delay:  200 },
+  { size: 64, left:   6, top:  80, amplitude:  9, duration: 3000, delay:    0, symbol: 'HDFCBANK'  },
+  { size: 64, left:  88, top:  35, amplitude:  9, duration: 2800, delay:  600, symbol: 'SWIGGY'    },
+  { size: 64, left: 192, top:  78, amplitude:  6, duration: 3200, delay:  300, symbol: 'BHARTIARTL'},
+  { size: 56, left: 130, top: 122, amplitude: 10, duration: 2700, delay:  800, symbol: 'TITAN'     },
+  { size: 56, left: 244, top:  18, amplitude: 10, duration: 3100, delay:  400, symbol: 'ETERNAL'   },
+  { size: 32, left: 268, top: 118, amplitude: 12, duration: 2900, delay:  900, symbol: 'RELIANCE'  },
+  { size: 24, left:  50, top:  12, amplitude: 13, duration: 2600, delay:  200, symbol: 'TCS'       },
 ] as const;
 
 const CLUSTER_H = 190;
-const N_LOGOS = CIRCLES.length;
-const RESHUFFLE_MS = 5000;
-
-function pickSymbols(n: number): string[] {
-  const pool = [...LOGO_SYMBOLS];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  return pool.slice(0, n);
-}
 
 function FloatingBubble({
   size, left, top, amplitude, duration, delay, logoSrc,
 }: { size: number; left: number; top: number; amplitude: number; duration: number; delay: number; logoSrc: any }) {
   const { colors } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
-  const crossFade = useRef(new Animated.Value(1)).current;
-  const currRef = useRef(logoSrc);
-  const [prevSrc, setPrevSrc] = useState(logoSrc);
-  const [currSrc, setCurrSrc] = useState(logoSrc);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -78,16 +63,6 @@ function FloatingBubble({
     return () => loop.stop();
   }, []);
 
-  useEffect(() => {
-    if (logoSrc === currRef.current) return;
-    const old = currRef.current;
-    currRef.current = logoSrc;
-    setPrevSrc(old);
-    setCurrSrc(logoSrc);
-    crossFade.setValue(0);
-    Animated.timing(crossFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, [logoSrc]);
-
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] });
   const scale = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.036, 1] });
 
@@ -105,8 +80,7 @@ function FloatingBubble({
         transform: [{ translateY }, { scale }],
       }}
     >
-      <Image source={prevSrc} style={{ position: 'absolute', width: size, height: size }} resizeMode="contain" />
-      <Animated.Image source={currSrc} style={{ width: size, height: size, opacity: crossFade }} resizeMode="contain" />
+      <Image source={logoSrc} style={{ width: size, height: size }} resizeMode="contain" />
     </Animated.View>
   );
 }
@@ -117,16 +91,6 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const [draftName, setDraftName] = useState('');
   const [inputFocused, setInputFocused] = useState(true);
-
-  const [logos, setLogos] = useState(() => pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)));
-
-  // Re-shuffle logos every 5 s so the cluster feels alive
-  useEffect(() => {
-    const id = setInterval(() => {
-      setLogos(pickSymbols(N_LOGOS).map(sym => getStockLogo(sym)));
-    }, RESHUFFLE_MS);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.backgroundPrimary }]}>
@@ -155,7 +119,7 @@ export default function Home() {
         <View style={styles.hero}>
           <View style={[styles.cluster, { backgroundColor: colors.backgroundPrimary }]}>
             {CIRCLES.map((c, i) => (
-              <FloatingBubble key={i} {...c} logoSrc={logos[i]} />
+              <FloatingBubble key={i} {...c} logoSrc={getStockLogo(c.symbol)} />
             ))}
           </View>
 
