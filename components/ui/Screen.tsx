@@ -1,5 +1,5 @@
-import React from 'react';
-import { SafeAreaView, ScrollView, StatusBar, StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, SafeAreaView, ScrollView, StatusBar, StyleSheet, View, ViewStyle } from 'react-native';
 import { useTheme } from '@/constants/theme';
 import { spacing } from '@/constants/tokens';
 
@@ -8,14 +8,24 @@ type Props = {
   scroll?: boolean;
   padded?: boolean;
   style?: ViewStyle;
+  scrollY?: Animated.Value;
 };
 
-export function Screen({ children, scroll = false, padded = true, style }: Props) {
+export function Screen({ children, scroll = false, padded = true, style, scrollY }: Props) {
   const { colors } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    if (!scrollY) return;
+    const id = scrollY.addListener(({ value }) => setScrolled(value >= 8));
+    return () => scrollY.removeListener(id);
+  }, [scrollY]);
+
+  const bgColor = scrolled ? colors.backgroundSurfaceZ1 : colors.backgroundPrimary;
   const Container = scroll ? ScrollView : View;
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.backgroundPrimary }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.backgroundPrimary} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: bgColor }]}>
+      <StatusBar barStyle="light-content" backgroundColor={bgColor} />
       <Container
         style={[styles.container, style]}
         contentContainerStyle={padded && scroll ? { padding: spacing.l } : undefined}

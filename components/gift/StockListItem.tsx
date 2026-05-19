@@ -8,10 +8,11 @@ import { formatINR } from '@/utils/format';
 
 type Props = {
   stock: Stock;
+  isLast?: boolean;
   onPress?: () => void;
 };
 
-export function StockListItem({ stock, onPress }: Props) {
+export function StockListItem({ stock, isLast, onPress }: Props) {
   const { colors } = useTheme();
   const currentValue = stock.pricePerShare * stock.sharesHeld;
   const currentValueColor =
@@ -64,11 +65,13 @@ export function StockListItem({ stock, onPress }: Props) {
         </Text>
       </View>
 
-      {/* Divider indented to align with text (16 pad + 40 avatar + 16 gap = 72) */}
-      <View
-        style={[styles.divider, { backgroundColor: colors.borderPrimary }]}
-        pointerEvents="none"
-      />
+      {/* Divider — hidden on last row */}
+      {!isLast && (
+        <View
+          style={[styles.divider, { backgroundColor: colors.borderPrimary }]}
+          pointerEvents="none"
+        />
+      )}
     </Pressable>
   );
 }

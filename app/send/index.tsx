@@ -31,12 +31,31 @@ export default function PickStock() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const listRef = useRef<FlatList>(null);
   const searchRef = useRef<TextInput>(null);
+  const anchorPrices = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetchLivePrices(STOCKS.map((s) => s.symbol)).then((p) => {
+      anchorPrices.current = p;
       setPrices(p);
       setLoadingPrices(false);
     });
+  }, []);
+
+  // Tick every 1.5 s: ±0.15% jitter, clamped to ±2% of anchor
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPrices((prev) => {
+        const next: Record<string, number> = {};
+        for (const sym of Object.keys(prev)) {
+          const anchor = anchorPrices.current[sym] ?? prev[sym];
+          const jitter = (Math.random() - 0.5) * 0.003;
+          const raw = prev[sym] * (1 + jitter);
+          next[sym] = Math.max(anchor * 0.98, Math.min(anchor * 1.02, raw));
+        }
+        return next;
+      });
+    }, 1500);
+    return () => clearInterval(id);
   }, []);
 
   // Scroll to top when search is focused so the search bar becomes visible
@@ -115,14 +134,14 @@ export default function PickStock() {
           {enriched.length} stock{enriched.length !== 1 ? 's' : ''}
         </Text>
         <Text style={[type.bodySmall, { color: colors.contentSecondary }]}>
-          Current / Invested
+          Current/Invested
         </Text>
       </View>
     </View>
   );
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} scrollY={scrollY}>
       <AppBar
         title="Pick a stock"
         showBack
@@ -142,9 +161,10 @@ export default function PickStock() {
           useNativeDriver: false,
         })}
         scrollEventThrottle={16}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <StockListItem
             stock={item}
+            isLast={index === enriched.length - 1}
             onPress={() => router.push(`/send/${item.symbol}?price=${item.pricePerShare}`)}
           />
         )}
@@ -176,7 +196,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.s,
+    paddingTop: spacing.l,
+    paddingBottom: spacing.s,
   },
   empty: {
     alignItems: 'center',
