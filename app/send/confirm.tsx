@@ -264,7 +264,6 @@ export default function PreviewGift() {
         title="Preview"
         showBack
         leftTitle
-        bgColor="#060809"
       />
 
       <View style={styles.body}>
