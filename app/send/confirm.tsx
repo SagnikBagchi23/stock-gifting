@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -18,6 +18,7 @@ import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
 import { AppBar } from '@/components/ui/AppBar';
+import { CardGradient, GRADIENT_SPECS } from '@/components/gift/CardGradient';
 import { findStock } from '@/data/stocks';
 import { getStockLogo } from '@/data/stockLogos';
 import { spacing, radius, fonts } from '@/constants/tokens';
@@ -29,14 +30,7 @@ const EAS_PROJECT_ID = '3e962d09-1429-4ef5-a5ca-ffaeb85c4723';
 const EAS_CHANNEL = 'preview';
 const REDIRECT_ORIGIN = 'https://stock-gifting.vercel.app';
 
-// Metro bundler requires literal require() paths
-const GRADIENTS = [
-  require('@/assets/preview-card/gradient 1.png'),
-  require('@/assets/preview-card/gradient 2.png'),
-  require('@/assets/preview-card/gradient 3.png'),
-  require('@/assets/preview-card/gradient 4.png'),
-  require('@/assets/preview-card/gradient 5.png'),
-] as const;
+const GROWW_LOGO = require('@/assets/groww-logo.png');
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -44,11 +38,16 @@ const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
 const SWATCH_SIZE = 40;
-const MAX_TILT = 10; // degrees
+const MAX_TILT = 4; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
-const FADE_MS = 700;
+const FADE_MS = 500;
 const BLUR_PEAK = 35;
+const GRAD_PARALLAX = 1.5; // px per degree of tilt — subtle, depth-only
+
+// Emil's strong custom easings — the built-in CSS/RN ones are too weak
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 
 export default function PreviewGift() {
   const { symbol, amount, unit, message, price } = useLocalSearchParams<{
@@ -79,7 +78,7 @@ export default function PreviewGift() {
   const blurIntensity = useSharedValue(0);   // swatch crossfade bridge
   const revealBlur = useSharedValue(0);      // initial content-reveal bridge
   const contentOpacity = useSharedValue(0);  // message + amount + logo
-  const cardScale = useSharedValue(0.9);
+  const cardScale = useSharedValue(0.95);
   const cardOpacity = useSharedValue(0);
   const floatY = useSharedValue(0);
   const tiltX = useSharedValue(0);
@@ -143,21 +142,21 @@ export default function PreviewGift() {
 
   // ── Mount enter animation ─────────────────────────────────────────────────
   useEffect(() => {
-    // 1. Card shell enters
-    cardOpacity.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.quad) });
-    cardScale.value = withSpring(1, { damping: 14, stiffness: 180 });
+    // 1. Card shell enters — timing, not spring, so it never overshoots
+    cardOpacity.value = withTiming(1, { duration: 500, easing: EASE_OUT });
+    cardScale.value = withTiming(1, { duration: 500, easing: EASE_OUT });
 
     // 2. Blur ramps up just before card is fully visible (bridges the empty→content swap)
     revealBlur.value = withSequence(
       withTiming(0, { duration: 280 }), // wait for card to mostly appear
-      withTiming(BLUR_PEAK, { duration: 200, easing: Easing.out(Easing.quad) }),
-      withTiming(0, { duration: 320, easing: Easing.in(Easing.quad) })
+      withTiming(BLUR_PEAK, { duration: 220, easing: EASE_OUT }),
+      withTiming(0, { duration: 360, easing: EASE_IN_OUT })
     );
 
-    // 3. Content snaps visible at blur peak (invisible swap — blur hides it)
+    // 3. Content fades in behind the blur peak — smooth not snappy
     contentOpacity.value = withSequence(
-      withTiming(0, { duration: 460 }), // hold until blur is at peak
-      withTiming(1, { duration: 20 })   // instant snap while blur masks it
+      withTiming(0, { duration: 380 }),
+      withTiming(1, { duration: 240, easing: EASE_OUT })
     );
   }, []);
 
@@ -189,13 +188,13 @@ export default function PreviewGift() {
         // beta = X-axis tilt (pitch), gamma = Y-axis tilt (roll).
         if (initialBeta.current === null) initialBeta.current = rotation.beta;
         const RAD2DEG = 180 / Math.PI;
-        const GAIN = 1.0;
+        const GAIN = 0.5;
         const pitchDeg = (rotation.beta - initialBeta.current) * RAD2DEG * GAIN;
         const rollDeg = rotation.gamma * RAD2DEG * GAIN;
         const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDeg));
         const ty = Math.max(-MAX_TILT, Math.min(MAX_TILT, rollDeg));
-        tiltX.value = withSpring(tx, { damping: 20, stiffness: 160, mass: 1.0 });
-        tiltY.value = withSpring(ty, { damping: 20, stiffness: 160, mass: 1.0 });
+        tiltX.value = withSpring(tx, { damping: 28, stiffness: 160, mass: 1.0 });
+        tiltY.value = withSpring(ty, { damping: 28, stiffness: 160, mass: 1.0 });
       });
     });
 
@@ -216,16 +215,16 @@ export default function PreviewGift() {
       const prev = activeGradient;
       setActiveGradient(index);
 
-      gradOpacities[prev].value = withTiming(0, { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) });
+      gradOpacities[prev].value = withTiming(0, { duration: FADE_MS, easing: EASE_IN_OUT });
       gradOpacities[index].value = withTiming(
         1,
-        { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) },
+        { duration: FADE_MS, easing: EASE_IN_OUT },
         (finished) => { if (finished) runOnJS(unlockFade)(); }
       );
 
       blurIntensity.value = withSequence(
-        withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) })
+        withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: EASE_IN_OUT }),
+        withTiming(0, { duration: FADE_MS * 0.5, easing: EASE_IN_OUT })
       );
     },
     [activeGradient, unlockFade]
@@ -250,6 +249,17 @@ export default function PreviewGift() {
   const gradStyle4 = useAnimatedStyle(() => ({ opacity: gradOpacity4.value }));
   const gradStyles = [gradStyle0, gradStyle1, gradStyle2, gradStyle3, gradStyle4];
 
+  // Gradient parallax: gradient stack is slightly pre-scaled (1.06) so we can
+  // translate it ±MAX_TILT*GRAD_PARALLAX (~6px) without ever exposing the card edge.
+  // Sign matches tilt direction so the gradient feels anchored "behind" the surface.
+  const gradStackStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: 1.06 },
+      { translateX: tiltY.value * GRAD_PARALLAX },
+      { translateY: -tiltX.value * GRAD_PARALLAX },
+    ],
+  }));
+
   const blurProps = useAnimatedProps(() => ({
     intensity: blurIntensity.value + revealBlur.value,
   }));
@@ -270,12 +280,14 @@ export default function PreviewGift() {
         {/* Gift card — 3D tilt + levitation */}
         <Animated.View style={cardWrapStyle}>
           <View style={styles.card}>
-            {/* All 5 gradients always mounted — no decode delay on transition */}
-            {GRADIENTS.map((src, i) => (
-              <Animated.View key={i} style={[StyleSheet.absoluteFill, gradStyles[i]]}>
-                <ImageBackground source={src} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              </Animated.View>
-            ))}
+            {/* Gradient stack: pre-scaled + counter-translated by tilt for subtle parallax */}
+            <Animated.View style={[StyleSheet.absoluteFill, gradStackStyle]} pointerEvents="none">
+              {GRADIENT_SPECS.map((spec, i) => (
+                <Animated.View key={i} style={[StyleSheet.absoluteFill, gradStyles[i]]}>
+                  <CardGradient spec={spec} width={CARD_W} height={CARD_H} />
+                </Animated.View>
+              ))}
+            </Animated.View>
 
             {/* Blur bridge overlay — peaks at crossover midpoint (Emil's technique) */}
             {/* Wrapping View is required: BlurView ignores borderRadius on iOS, the parent View clips it */}
@@ -289,27 +301,32 @@ export default function PreviewGift() {
 
             {/* Card content — fades in after card shell, bridged by revealBlur */}
             <Animated.View style={[StyleSheet.absoluteFill, contentStyle]} pointerEvents="none">
-              {/* Occasion message */}
-              <Text style={styles.messageText} numberOfLines={2}>
-                {message ?? ''}
-              </Text>
+              {/* Stock logo, top-left */}
+              {stockLogo && (
+                <Image source={stockLogo} style={styles.stockLogo} resizeMode="contain" />
+              )}
 
-              {/* Bottom row: gift amount + stock logo */}
-              <View style={styles.cardBottom}>
+              {/* Amount + message, bottom-left */}
+              <View style={styles.cardBottomLeft}>
                 <Text style={styles.amountText} adjustsFontSizeToFit numberOfLines={1}>
                   {displayAmount}
                 </Text>
-                {stockLogo && (
-                  <Image source={stockLogo} style={styles.stockLogo} resizeMode="contain" />
-                )}
+                {message ? (
+                  <Text style={styles.messageText} numberOfLines={2}>
+                    {message}
+                  </Text>
+                ) : null}
               </View>
+
+              {/* Groww logo, bottom-right */}
+              <Image source={GROWW_LOGO} style={styles.growwLogo} resizeMode="contain" />
             </Animated.View>
           </View>
         </Animated.View>
 
         {/* Gradient swatches */}
         <View style={styles.swatches}>
-          {GRADIENTS.map((src, i) => {
+          {GRADIENT_SPECS.map((spec, i) => {
             const isActive = i === activeGradient;
             return (
               <Pressable
@@ -317,12 +334,9 @@ export default function PreviewGift() {
                 onPress={() => handleSwatchPress(i)}
                 style={[styles.swatch, isActive && styles.swatchActive]}
               >
-                <ImageBackground
-                  source={src}
-                  style={styles.swatchInner}
-                  imageStyle={{ borderRadius: isActive ? SWATCH_SIZE / 2 - 2 : SWATCH_SIZE / 2 }}
-                  resizeMode="cover"
-                />
+                <View style={styles.swatchInner}>
+                  <CardGradient spec={spec} width={SWATCH_SIZE} height={SWATCH_SIZE} />
+                </View>
               </Pressable>
             );
           })}
@@ -369,39 +383,39 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
   },
-  messageText: {
-    position: 'absolute',
-    top: 138,
-    left: 24,
-    right: 24,
-    fontFamily: fonts.heading,
-    fontSize: 24,
-    lineHeight: 32,
-    color: '#FFFFFF',
-  },
-  cardBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 24,
-    paddingTop: 4,
-    paddingHorizontal: 24,
-  },
-  amountText: {
-    fontFamily: fonts.heading,
-    fontSize: 40,
-    lineHeight: 48,
-    color: '#FFFFFF',
-    flex: 1,
-  },
   stockLogo: {
+    position: 'absolute',
+    top: 24,
+    left: 24,
     width: 40,
     height: 40,
     borderRadius: radius.m,
+  },
+  cardBottomLeft: {
+    position: 'absolute',
+    bottom: 24,
+    left: 24,
+    right: 72, // leave room for the groww logo at bottom-right
+    gap: 2,
+  },
+  amountText: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    lineHeight: 40,
+    color: '#FFFFFF',
+  },
+  messageText: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#FFFFFF',
+  },
+  growwLogo: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 24,
+    height: 24,
   },
   swatches: {
     flexDirection: 'row',
