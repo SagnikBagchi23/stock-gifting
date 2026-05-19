@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
 function formatAmountDisplay(raw: string): string {
   if (!raw) return '';
@@ -34,7 +34,7 @@ export default function ComposeGift() {
 
   // Cursor blink
   const cursorOpacity = useRef(new Animated.Value(1)).current;
-  // Amount scale punch on keypress
+  // Content-aware scale: grows/shrinks with digit count
   const amountScale = useRef(new Animated.Value(1)).current;
   // Shake for error feedback
   const shakeX = useRef(new Animated.Value(0)).current;
@@ -52,15 +52,16 @@ export default function ComposeGift() {
     return () => blink.stop();
   }, [cursorOpacity]);
 
-  const punchAmount = () => {
-    amountScale.setValue(0.95);
-    Animated.spring(amountScale, {
-      toValue: 1,
+  useEffect(() => {
+    const len = formatAmountDisplay(amount).length;
+    const target = len <= 3 ? 1.0 : len <= 5 ? 0.85 : len <= 7 ? 0.72 : 0.60;
+    Animated.timing(amountScale, {
+      toValue: target,
+      duration: 180,
+      easing: Easing.bezier(0.77, 0, 0.175, 1),
       useNativeDriver: true,
-      damping: 15,
-      stiffness: 350,
     }).start();
-  };
+  }, [amount]);
 
   const triggerErrorFeedback = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -116,18 +117,15 @@ export default function ComposeGift() {
     if (key !== '⌫' && hasError) return;
     if (key === '⌫') {
       setAmount((prev) => prev.slice(0, -1));
-      punchAmount();
       return;
     }
     if (key === '.') return;
     if (amount === '0') {
       setAmount(key);
-      punchAmount();
       return;
     }
     if (amount.length >= 10) return;
     setAmount((prev) => prev + key);
-    punchAmount();
   };
 
   return (
@@ -169,8 +167,7 @@ export default function ComposeGift() {
                 key={v}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setAmount(v);
-                  punchAmount();
+                  setAmount(String(v));
                 }}
                 style={[
                   styles.quickPill,

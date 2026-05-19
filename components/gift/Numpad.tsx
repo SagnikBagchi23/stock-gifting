@@ -67,13 +67,15 @@ export function Numpad({ onKey, mode }: Props) {
 const styles = StyleSheet.create({
   numpad: {
     width: '100%',
-    padding: spacing.l,
+    paddingHorizontal: spacing.l,
+    paddingTop: spacing.l,
+    paddingBottom: 0,
     gap: spacing.s,
   },
   row: {
     flexDirection: 'row',
     gap: spacing.s,
-    height: 48,
+    height: 56,
   },
   key: {
     flex: 1,
