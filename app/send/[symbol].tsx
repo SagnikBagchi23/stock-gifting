@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   },
   buttonWrap: {
     paddingHorizontal: spacing.l,
-    paddingTop: spacing.m,
+    paddingTop: 0,
     paddingBottom: spacing.xs,
   },
 });
