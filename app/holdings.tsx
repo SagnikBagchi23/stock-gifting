@@ -47,7 +47,7 @@ export default function Holdings() {
   const total = items.reduce((acc, g) => acc + simulatedCurrentValue(g), 0);
 
   return (
-    <Screen padded={false} scrollY={scrollY}>
+    <Screen padded={false}>
       <AppBar title="My holdings" showBack scrollY={scrollY} />
       <Animated.FlatList
         data={items}

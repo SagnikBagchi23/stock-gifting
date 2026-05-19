@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, ScrollView, StatusBar, StyleSheet, View, ViewStyle } from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/constants/theme';
 import { spacing } from '@/constants/tokens';
@@ -9,28 +9,20 @@ type Props = {
   scroll?: boolean;
   padded?: boolean;
   style?: ViewStyle;
-  scrollY?: Animated.Value;
-  noBottomInset?: boolean;
 };
 
-export function Screen({ children, scroll = false, padded = true, style, scrollY, noBottomInset }: Props) {
+export function Screen({ children, scroll = false, padded = true, style }: Props) {
   const { colors } = useTheme();
-  const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    if (!scrollY) return;
-    const id = scrollY.addListener(({ value }) => setScrolled(value >= 8));
-    return () => scrollY.removeListener(id);
-  }, [scrollY]);
-
-  const bgColor = scrolled ? colors.backgroundSurfaceZ1 : colors.backgroundPrimary;
-  const edges = noBottomInset
-    ? (['top', 'left', 'right'] as const)
-    : (['top', 'left', 'right', 'bottom'] as const);
   const Container = scroll ? ScrollView : View;
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: bgColor }]} edges={edges}>
-      <StatusBar barStyle="light-content" backgroundColor={bgColor} />
+    // 'top' is excluded — AppBar extends into the status bar area and owns that background.
+    // 'bottom' is included so SafeAreaView pads the home indicator area with backgroundPrimary,
+    // which never changes (no scroll-aware color here).
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.backgroundPrimary }]}
+      edges={['left', 'right', 'bottom']}
+    >
       <Container
         style={[styles.container, style]}
         contentContainerStyle={padded && scroll ? { padding: spacing.l } : undefined}
