@@ -27,7 +27,7 @@ const CIRCLES = [
   { size: 64, left:   6, top:  80, amplitude:  9, duration: 3000, delay:    0 },
   { size: 64, left:  88, top:  35, amplitude:  9, duration: 2800, delay:  600 },
   { size: 64, left: 192, top:  78, amplitude:  6, duration: 3200, delay:  300 },
-  { size: 56, left: 144, top: 110, amplitude: 10, duration: 2700, delay:  800 },
+  { size: 56, left: 130, top: 122, amplitude: 10, duration: 2700, delay:  800 },
   { size: 56, left: 244, top:  18, amplitude: 10, duration: 3100, delay:  400 },
   { size: 32, left: 268, top: 118, amplitude: 12, duration: 2900, delay:  900 },
   { size: 24, left:  50, top:  12, amplitude: 13, duration: 2600, delay:  200 },
@@ -183,8 +183,8 @@ export default function Home() {
               ]}
             >
               <TextInput
-                style={[type.bodyBaseHeavy, { color: colors.contentPrimary, flex: 1, padding: 0 }]}
-                placeholder="e.g. Sagnik"
+                style={[type.bodyBaseHeavy, { color: colors.contentPrimary, flex: 1, padding: 0, marginTop: -2 }]}
+                placeholder="Your name"
                 placeholderTextColor={colors.contentTertiary}
                 value={draftName}
                 onChangeText={setDraftName}
