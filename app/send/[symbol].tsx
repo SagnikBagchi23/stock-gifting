@@ -40,6 +40,8 @@ export default function ComposeGift() {
   const shakeX = useRef(new Animated.Value(0)).current;
   // Error message fade
   const errorOpacity = useRef(new Animated.Value(0)).current;
+  // Current value fade (shown when qty is valid, hidden on error)
+  const valueOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const blink = Animated.loop(
@@ -93,6 +95,16 @@ export default function ComposeGift() {
     setHadError(hasError);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasError]);
+
+  useEffect(() => {
+    const show = Number.isFinite(qty) && qty > 0 && !hasError;
+    Animated.timing(valueOpacity, {
+      toValue: show ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qty, hasError]);
 
   if (!stock) {
     return (
@@ -152,12 +164,20 @@ export default function ComposeGift() {
                 style={[styles.cursor, { backgroundColor: colors.contentAccent, opacity: cursorOpacity }]}
             />
             </Animated.View>
-            <Animated.Text
-              style={[type.bodySmall, { color: colors.contentNegative, opacity: errorOpacity }]}
-              numberOfLines={1}
-            >
-              {errorMsg}
-            </Animated.Text>
+            <View style={{ height: 18, alignItems: 'center', justifyContent: 'center' }}>
+              <Animated.Text
+                style={[type.bodySmall, { color: colors.contentSecondary, opacity: valueOpacity, position: 'absolute' }]}
+                numberOfLines={1}
+              >
+                {Number.isFinite(qty) && qty > 0 ? formatINR(qty * pricePerShare) : ''}
+              </Animated.Text>
+              <Animated.Text
+                style={[type.bodySmall, { color: colors.contentNegative, opacity: errorOpacity, position: 'absolute' }]}
+                numberOfLines={1}
+              >
+                {errorMsg}
+              </Animated.Text>
+            </View>
           </Animated.View>
 
           {/* Quick-select pills */}
