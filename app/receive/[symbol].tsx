@@ -34,8 +34,8 @@ const GRADIENTS = [
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-const CARD_W = 328;
-const CARD_H = 246;
+const CARD_W = 320;
+const CARD_H = 427;
 const CARD_RADIUS = 24;
 const MAX_TILT = 15;
 const FLIP_PAUSE_MS = 1200;

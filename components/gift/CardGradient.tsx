@@ -67,42 +67,53 @@ export const GRADIENT_SPECS: GradientSpec[] = [
     ],
   },
 
-  // g2: Burnt orange top-right + cream center + cobalt blue bottom-left. Figma node 1212:2160.
+  // g2: Burnt orange top-right + cream center + cobalt blue bottom. Figma node 1212:2160.
   {
     id: 'g2',
     background: '#04080E',
     layers: [
       {
         kind: 'radial',
-        center: [0.88, 0.06],
-        radius: 0.78,
+        center: [0.95, 0.05],
+        radius: 0.95,
         stops: [
-          { offset: 0, color: '#D85010', opacity: 0.95 },
-          { offset: 1, color: '#D85010', opacity: 0 },
+          { offset: 0, color: '#FF5A10', opacity: 1 },
+          { offset: 0.45, color: '#D84008', opacity: 0.85 },
+          { offset: 1, color: '#D84008', opacity: 0 },
         ],
       },
       {
         kind: 'radial',
-        center: [0.2, 0.42],
-        radius: 0.52,
+        center: [0.18, 0.42],
+        radius: 0.55,
         stops: [
-          { offset: 0, color: '#F0E4C8', opacity: 0.92 },
-          { offset: 1, color: '#F0E4C8', opacity: 0 },
+          { offset: 0, color: '#F4EAD0', opacity: 0.95 },
+          { offset: 1, color: '#F4EAD0', opacity: 0 },
         ],
       },
       {
         kind: 'radial',
-        center: [0.06, 0.9],
-        radius: 0.68,
+        center: [0.35, 0.95],
+        radius: 0.75,
         stops: [
-          { offset: 0, color: '#1A38C8', opacity: 0.92 },
-          { offset: 1, color: '#1A38C8', opacity: 0 },
+          { offset: 0, color: '#1A38C8', opacity: 0.95 },
+          { offset: 0.55, color: '#0820A0', opacity: 0.7 },
+          { offset: 1, color: '#0820A0', opacity: 0 },
+        ],
+      },
+      {
+        kind: 'radial',
+        center: [0.62, 0.78],
+        radius: 0.35,
+        stops: [
+          { offset: 0, color: '#020410', opacity: 0.65 },
+          { offset: 1, color: '#020410', opacity: 0 },
         ],
       },
     ],
   },
 
-  // g3: Dark green base, cream bloom, yellow band, hot-pink right. Figma node 1213:1753.
+  // g3: Dark green base, cream bloom, vertical yellow band, hot-pink right. Figma node 1213:1753.
   {
     id: 'g3',
     background: '#020A06',
@@ -112,36 +123,56 @@ export const GRADIENT_SPECS: GradientSpec[] = [
         from: [0, 0.5],
         to: [1, 0.5],
         stops: [
-          { offset: 0, color: '#020E06' },
-          { offset: 0.55, color: '#6A0828' },
-          { offset: 1, color: '#CC1050' },
+          { offset: 0, color: '#03100A' },
+          { offset: 0.35, color: '#1A0810' },
+          { offset: 0.72, color: '#A00830' },
+          { offset: 1, color: '#E81048' },
         ],
       },
       {
         kind: 'radial',
-        center: [0.52, 0.38],
-        radius: 0.24,
+        center: [0.7, 0.45],
+        radius: 0.18,
         stops: [
-          { offset: 0, color: '#FFE010', opacity: 0.95 },
-          { offset: 1, color: '#FFE010', opacity: 0 },
+          { offset: 0, color: '#FFE020', opacity: 1 },
+          { offset: 0.6, color: '#FFC008', opacity: 0.7 },
+          { offset: 1, color: '#FFC008', opacity: 0 },
         ],
       },
       {
         kind: 'radial',
-        center: [0.28, 0.42],
-        radius: 0.38,
+        center: [0.68, 0.5],
+        radius: 0.55,
         stops: [
-          { offset: 0, color: '#EEE4C8', opacity: 0.88 },
-          { offset: 1, color: '#EEE4C8', opacity: 0 },
+          { offset: 0, color: '#FFD810', opacity: 0.35 },
+          { offset: 1, color: '#FFD810', opacity: 0 },
         ],
       },
       {
         kind: 'radial',
-        center: [0.92, 0.4],
-        radius: 0.48,
+        center: [0.45, 0.48],
+        radius: 0.32,
         stops: [
-          { offset: 0, color: '#E8104C', opacity: 0.82 },
-          { offset: 1, color: '#E8104C', opacity: 0 },
+          { offset: 0, color: '#F2E2C8', opacity: 0.85 },
+          { offset: 1, color: '#F2E2C8', opacity: 0 },
+        ],
+      },
+      {
+        kind: 'radial',
+        center: [0.95, 0.5],
+        radius: 0.4,
+        stops: [
+          { offset: 0, color: '#FF1858', opacity: 0.9 },
+          { offset: 1, color: '#FF1858', opacity: 0 },
+        ],
+      },
+      {
+        kind: 'radial',
+        center: [0.08, 0.5],
+        radius: 0.5,
+        stops: [
+          { offset: 0, color: '#021008', opacity: 0.7 },
+          { offset: 1, color: '#021008', opacity: 0 },
         ],
       },
     ],

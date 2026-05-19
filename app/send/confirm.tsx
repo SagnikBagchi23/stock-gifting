@@ -34,8 +34,8 @@ const GROWW_LOGO = require('@/assets/groww-logo.png');
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-const CARD_W = 328;
-const CARD_H = 246;
+const CARD_W = 320;
+const CARD_H = 427;
 const CARD_RADIUS = 24;
 const SWATCH_SIZE = 40;
 const MAX_TILT = 4; // degrees
