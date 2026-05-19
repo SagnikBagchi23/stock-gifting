@@ -3,7 +3,7 @@ import {
   Animated,
   Easing,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Text,
@@ -92,6 +92,29 @@ export default function Home() {
   const [draftName, setDraftName] = useState('');
   const [inputFocused, setInputFocused] = useState(true);
 
+  const keyboardPad = useRef(new Animated.Value(insets.bottom)).current;
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvt, (e) => {
+      Animated.timing(keyboardPad, {
+        toValue: e.endCoordinates.height + spacing.l + 4,
+        duration: e.duration > 0 ? e.duration : 250,
+        easing: Easing.bezier(0.36, 0.66, 0.04, 1),
+        useNativeDriver: false,
+      }).start();
+    });
+    const onHide = Keyboard.addListener(hideEvt, (e) => {
+      Animated.timing(keyboardPad, {
+        toValue: insets.bottom,
+        duration: e.duration > 0 ? e.duration : 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { onShow.remove(); onHide.remove(); };
+  }, [insets.bottom]);
+
   return (
     <View style={[styles.root, { backgroundColor: colors.backgroundPrimary }]}>
       {/* App bar */}
@@ -111,12 +134,7 @@ export default function Home() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Hero: full-width bubble cluster + headline */}
-        <View style={styles.hero}>
+      <View style={styles.hero}>
           <View style={[styles.cluster, { backgroundColor: colors.backgroundPrimary }]}>
             {CIRCLES.map((c, i) => (
               <FloatingBubble key={i} {...c} logoSrc={getStockLogo(c.symbol)} />
@@ -133,8 +151,8 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Input + CTA — 16 px gap between button bottom and keyboard top */}
-        <View style={[styles.inputSection, { paddingBottom: spacing.l }]}>
+        {/* Input + CTA — rises in sync with keyboard */}
+        <Animated.View style={[styles.inputSection, { paddingBottom: keyboardPad }]}>
           <View style={styles.fieldWrap}>
             <View
               style={[
@@ -171,8 +189,7 @@ export default function Home() {
               router.replace('/send');
             }}
           />
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
     </View>
   );
 }
@@ -210,7 +227,7 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingHorizontal: spacing.l,
   },
-  inputSection: { paddingHorizontal: spacing.l, gap: spacing.m },
+  inputSection: { paddingHorizontal: spacing.l, paddingTop: spacing.m, gap: spacing.m },
   fieldWrap: { gap: spacing.xs },
   textField: {
     height: 56,
