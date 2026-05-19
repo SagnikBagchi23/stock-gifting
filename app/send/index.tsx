@@ -141,7 +141,7 @@ export default function PickStock() {
   );
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} noBottomInset>
       <AppBar
         title="Pick a stock"
         showBack
