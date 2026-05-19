@@ -184,7 +184,7 @@ export default function ComposeGift() {
       </View>
 
       {/* Docked button + numpad */}
-      <View style={styles.bottomDock}>
+      <View style={[styles.bottomDock, { marginBottom: -insets.bottom }]}>
         <View style={styles.buttonWrap}>
           <Button
             title="Continue"
@@ -197,7 +197,6 @@ export default function ComposeGift() {
           />
         </View>
         <Numpad onKey={handleKey} mode={unit === 'rupees' ? 'amount' : 'quantity'} />
-        <View style={{ height: Math.max(0, insets.bottom - 12) }} />
       </View>
     </Screen>
   );
