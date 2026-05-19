@@ -20,14 +20,17 @@ import { getStockLogo, LOGO_SYMBOLS } from '@/data/stockLogos';
 
 // 7-bubble layout matching Figma node 1188-2205.
 // Amplitude is 20% higher than v1 for more levitation energy.
+// Bubbles are positioned within a fixed CLUSTER_W×CLUSTER_H canvas that is
+// centered on screen, so layout is screen-width-independent.
+const CLUSTER_W = 320;
 const CIRCLES = [
-  { size: 64, left:  21, top:  83, amplitude:  9, duration: 3000, delay:    0 },
-  { size: 64, left: 104, top:  40, amplitude:  9, duration: 2800, delay:  600 },
-  { size: 96, left: 241, top:  90, amplitude:  6, duration: 3200, delay:  300 }, // biggest
-  { size: 56, left: 153, top: 113, amplitude: 10, duration: 2700, delay:  800 },
-  { size: 56, left: 197, top:   1, amplitude: 10, duration: 3100, delay:  400 },
-  { size: 32, left: 286, top:  40, amplitude: 12, duration: 2900, delay:  900 },
-  { size: 24, left:  63, top:  18, amplitude: 13, duration: 2600, delay:  200 },
+  { size: 64, left:   6, top:  80, amplitude:  9, duration: 3000, delay:    0 },
+  { size: 64, left:  88, top:  35, amplitude:  9, duration: 2800, delay:  600 },
+  { size: 64, left: 192, top:  78, amplitude:  6, duration: 3200, delay:  300 },
+  { size: 56, left: 144, top: 110, amplitude: 10, duration: 2700, delay:  800 },
+  { size: 56, left: 244, top:  18, amplitude: 10, duration: 3100, delay:  400 },
+  { size: 32, left: 268, top: 118, amplitude: 12, duration: 2900, delay:  900 },
+  { size: 24, left:  50, top:  12, amplitude: 13, duration: 2600, delay:  200 },
 ] as const;
 
 const CLUSTER_H = 190;
@@ -235,8 +238,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.m,
   },
   cluster: {
-    width: '100%',
+    width: CLUSTER_W,
     height: CLUSTER_H,
+    alignSelf: 'center',
   },
   heroText: {
     gap: 2,

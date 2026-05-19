@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
-  interpolate,
   runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
@@ -45,7 +44,7 @@ const CARD_W = 328;
 const CARD_H = 246;
 const CARD_RADIUS = 24;
 const SWATCH_SIZE = 40;
-const MAX_TILT = 22; // degrees
+const MAX_TILT = 10; // degrees
 const FLOAT_AMP = 8; // px
 const FLOAT_MS = 2600;
 const FADE_MS = 700;
@@ -66,13 +65,17 @@ export default function PreviewGift() {
     unit === 'rupees' ? formatINR(qty) : `${Number.isFinite(qty) ? qty : 0} shares`;
 
   // ── Gradient cross-fade state ─────────────────────────────────────────────
-  const [layerA, setLayerA] = useState(0);
-  const [layerB, setLayerB] = useState(0);
   const [activeGradient, setActiveGradient] = useState(0);
   const fadeLocked = useRef(false);
 
   // ── Animated values ───────────────────────────────────────────────────────
-  const fadeProgress = useSharedValue(0);    // 0=A visible, 1=B visible
+  // One opacity per gradient — all images stay mounted so there's no decode delay on transition
+  const gradOpacity0 = useSharedValue(1);
+  const gradOpacity1 = useSharedValue(0);
+  const gradOpacity2 = useSharedValue(0);
+  const gradOpacity3 = useSharedValue(0);
+  const gradOpacity4 = useSharedValue(0);
+  const gradOpacities = [gradOpacity0, gradOpacity1, gradOpacity2, gradOpacity3, gradOpacity4];
   const blurIntensity = useSharedValue(0);   // swatch crossfade bridge
   const revealBlur = useSharedValue(0);      // initial content-reveal bridge
   const contentOpacity = useSharedValue(0);  // message + amount + logo
@@ -186,13 +189,13 @@ export default function PreviewGift() {
         // beta = X-axis tilt (pitch), gamma = Y-axis tilt (roll).
         if (initialBeta.current === null) initialBeta.current = rotation.beta;
         const RAD2DEG = 180 / Math.PI;
-        const GAIN = 2.2; // amplify small tilts so the effect is obvious
+        const GAIN = 1.0;
         const pitchDeg = (rotation.beta - initialBeta.current) * RAD2DEG * GAIN;
         const rollDeg = rotation.gamma * RAD2DEG * GAIN;
         const tx = Math.max(-MAX_TILT, Math.min(MAX_TILT, -pitchDeg));
         const ty = Math.max(-MAX_TILT, Math.min(MAX_TILT, rollDeg));
-        tiltX.value = withSpring(tx, { damping: 14, stiffness: 220, mass: 0.6 });
-        tiltY.value = withSpring(ty, { damping: 14, stiffness: 220, mass: 0.6 });
+        tiltX.value = withSpring(tx, { damping: 20, stiffness: 160, mass: 1.0 });
+        tiltY.value = withSpring(ty, { damping: 20, stiffness: 160, mass: 1.0 });
       });
     });
 
@@ -200,20 +203,9 @@ export default function PreviewGift() {
   }, []);
 
   // ── Gradient swap with cross-fade ─────────────────────────────────────────
-  // Pending commit: after the fade completes we need to swap layerA's source
-  // to the new gradient. We can't reset fadeProgress in the worklet callback
-  // because React hasn't committed the new <ImageBackground source={...}> yet,
-  // so the old layerA would flash for one frame. Instead we store the pending
-  // index, let React commit it (useLayoutEffect), then reset fadeProgress.
-  const [pendingCommit, setPendingCommit] = useState<number | null>(null);
-
-  useLayoutEffect(() => {
-    if (pendingCommit === null) return;
-    // layerA has been re-rendered with the new source — safe to flip opacity back.
-    fadeProgress.value = 0;
-    setPendingCommit(null);
-    fadeLocked.current = false;
-  }, [pendingCommit]);
+  // All 5 gradients are always mounted. Swapping is just animating opacities,
+  // so there's never a decode-delay frame that causes flicker.
+  const unlockFade = useCallback(() => { fadeLocked.current = false; }, []);
 
   const handleSwatchPress = useCallback(
     (index: number) => {
@@ -221,29 +213,22 @@ export default function PreviewGift() {
       fadeLocked.current = true;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+      const prev = activeGradient;
       setActiveGradient(index);
-      setLayerB(index);
 
-      // Blur ramps up to peak at the crossover midpoint, then dissolves
+      gradOpacities[prev].value = withTiming(0, { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) });
+      gradOpacities[index].value = withTiming(
+        1,
+        { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) },
+        (finished) => { if (finished) runOnJS(unlockFade)(); }
+      );
+
       blurIntensity.value = withSequence(
         withTiming(BLUR_PEAK, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) }),
         withTiming(0, { duration: FADE_MS * 0.5, easing: Easing.inOut(Easing.quad) })
       );
-
-      fadeProgress.value = withTiming(
-        1,
-        { duration: FADE_MS, easing: Easing.inOut(Easing.cubic) },
-        (finished) => {
-          if (finished) {
-            // Hand off to JS — the layout effect resets fadeProgress AFTER
-            // React commits the new layerA source, eliminating the flicker.
-            runOnJS(setLayerA)(index);
-            runOnJS(setPendingCommit)(index);
-          }
-        }
-      );
     },
-    [activeGradient]
+    [activeGradient, unlockFade]
   );
 
   // ── Animated styles ───────────────────────────────────────────────────────
@@ -258,13 +243,12 @@ export default function PreviewGift() {
     ],
   }));
 
-  const layerAStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(fadeProgress.value, [0, 1], [1, 0]),
-  }));
-
-  const layerBStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(fadeProgress.value, [0, 1], [0, 1]),
-  }));
+  const gradStyle0 = useAnimatedStyle(() => ({ opacity: gradOpacity0.value }));
+  const gradStyle1 = useAnimatedStyle(() => ({ opacity: gradOpacity1.value }));
+  const gradStyle2 = useAnimatedStyle(() => ({ opacity: gradOpacity2.value }));
+  const gradStyle3 = useAnimatedStyle(() => ({ opacity: gradOpacity3.value }));
+  const gradStyle4 = useAnimatedStyle(() => ({ opacity: gradOpacity4.value }));
+  const gradStyles = [gradStyle0, gradStyle1, gradStyle2, gradStyle3, gradStyle4];
 
   const blurProps = useAnimatedProps(() => ({
     intensity: blurIntensity.value + revealBlur.value,
@@ -287,23 +271,12 @@ export default function PreviewGift() {
         {/* Gift card — 3D tilt + levitation */}
         <Animated.View style={cardWrapStyle}>
           <View style={styles.card}>
-            {/* Layer A — current gradient */}
-            <Animated.View style={[StyleSheet.absoluteFill, layerAStyle]}>
-              <ImageBackground
-                source={GRADIENTS[layerA]}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-            </Animated.View>
-
-            {/* Layer B — incoming gradient (fades in) */}
-            <Animated.View style={[StyleSheet.absoluteFill, layerBStyle]}>
-              <ImageBackground
-                source={GRADIENTS[layerB]}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-            </Animated.View>
+            {/* All 5 gradients always mounted — no decode delay on transition */}
+            {GRADIENTS.map((src, i) => (
+              <Animated.View key={i} style={[StyleSheet.absoluteFill, gradStyles[i]]}>
+                <ImageBackground source={src} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              </Animated.View>
+            ))}
 
             {/* Blur bridge overlay — peaks at crossover midpoint (Emil's technique) */}
             {/* Wrapping View is required: BlurView ignores borderRadius on iOS, the parent View clips it */}

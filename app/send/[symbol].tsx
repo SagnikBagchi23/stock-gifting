@@ -189,20 +189,18 @@ export default function ComposeGift() {
               style={[styles.amountRow, { transform: [{ scale: amountScale }, { translateX: shakeX }] }]}
             >
               {unit === 'rupees' && (
-                <Text style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}>₹</Text>
+                <Text style={[styles.amountText, { color: colors.contentPrimary }]}>₹</Text>
               )}
               {amount.length > 0 && (
-                <Text style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}>
+                <Text style={[styles.amountText, { color: colors.contentPrimary }]}>
                   {formatAmountDisplay(amount)}
                 </Text>
               )}
               <Animated.View
-                style={[styles.cursor, { backgroundColor: hasError ? colors.contentNegative : colors.contentAccent, opacity: cursorOpacity }]}
+                style={[styles.cursor, { backgroundColor: colors.contentAccent, opacity: cursorOpacity }]}
             />
             {unit === 'shares' && amount.length > 0 && (
-              <Text
-                style={[styles.amountText, { color: hasError ? colors.contentNegative : colors.contentPrimary }]}
-              >
+              <Text style={[styles.amountText, { color: colors.contentPrimary }]}>
                 {' qty'}
               </Text>
             )}
