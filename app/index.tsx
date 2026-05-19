@@ -51,8 +51,10 @@ function FloatingBubble({
 }: { size: number; left: number; top: number; amplitude: number; duration: number; delay: number; logoSrc: any }) {
   const { colors } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
-  const logoOpacity = useRef(new Animated.Value(1)).current;
-  const prevSrc = useRef(logoSrc);
+  const crossFade = useRef(new Animated.Value(1)).current;
+  const currRef = useRef(logoSrc);
+  const [prevSrc, setPrevSrc] = useState(logoSrc);
+  const [currSrc, setCurrSrc] = useState(logoSrc);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -76,14 +78,14 @@ function FloatingBubble({
     return () => loop.stop();
   }, []);
 
-  // Fade out → swap source → fade in when logo changes
   useEffect(() => {
-    if (logoSrc === prevSrc.current) return;
-    prevSrc.current = logoSrc;
-    Animated.sequence([
-      Animated.timing(logoOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-      Animated.timing(logoOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start();
+    if (logoSrc === currRef.current) return;
+    const old = currRef.current;
+    currRef.current = logoSrc;
+    setPrevSrc(old);
+    setCurrSrc(logoSrc);
+    crossFade.setValue(0);
+    Animated.timing(crossFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, [logoSrc]);
 
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] });
@@ -103,11 +105,8 @@ function FloatingBubble({
         transform: [{ translateY }, { scale }],
       }}
     >
-      <Animated.Image
-        source={logoSrc}
-        style={{ width: size, height: size, opacity: logoOpacity }}
-        resizeMode="contain"
-      />
+      <Image source={prevSrc} style={{ position: 'absolute', width: size, height: size }} resizeMode="contain" />
+      <Animated.Image source={currSrc} style={{ width: size, height: size, opacity: crossFade }} resizeMode="contain" />
     </Animated.View>
   );
 }
@@ -241,6 +240,7 @@ const styles = StyleSheet.create({
     width: CLUSTER_W,
     height: CLUSTER_H,
     alignSelf: 'center',
+    marginTop: -12,
   },
   heroText: {
     gap: 2,
