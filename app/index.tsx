@@ -182,7 +182,7 @@ export default function Home() {
               ]}
             >
               <TextInput
-                style={[type.bodyBaseHeavy, { color: colors.contentPrimary, flex: 1, padding: 0, marginTop: -2 }]}
+                style={[{ fontFamily: fonts.bodyMedium, fontSize: 14 }, { color: colors.contentPrimary, flex: 1, padding: 0 }]}
                 placeholder="Your name"
                 placeholderTextColor={colors.contentTertiary}
                 value={draftName}
