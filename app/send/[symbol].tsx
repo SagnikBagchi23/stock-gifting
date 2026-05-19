@@ -197,7 +197,7 @@ export default function ComposeGift() {
           />
         </View>
         <Numpad onKey={handleKey} mode={unit === 'rupees' ? 'amount' : 'quantity'} />
-        <View style={{ height: insets.bottom }} />
+        <View style={{ height: Math.max(0, insets.bottom - 12) }} />
       </View>
     </Screen>
   );
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   },
   buttonWrap: {
     paddingHorizontal: spacing.l,
-    paddingTop: 0,
+    paddingTop: spacing.m,
     paddingBottom: spacing.xs,
   },
 });
