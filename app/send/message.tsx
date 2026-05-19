@@ -42,7 +42,7 @@ export default function WriteMessage() {
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const onShow = Keyboard.addListener(showEvt, (e) => {
       Animated.timing(keyboardPad, {
-        toValue: e.endCoordinates.height - insets.bottom + 16,
+        toValue: e.endCoordinates.height - insets.bottom + 20,
         duration: e.duration > 0 ? e.duration : 250,
         easing: Easing.bezier(0.36, 0.66, 0.04, 1),
         useNativeDriver: false,
