@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
+  Animated,
+  Easing,
+  Keyboard,
   Platform,
   StyleSheet,
   Text,
@@ -16,7 +18,7 @@ import { findStock } from '@/data/stocks';
 import { useTheme } from '@/constants/theme';
 import { spacing, type, radius } from '@/constants/tokens';
 
-const MAX_CHARS = 50;
+const MAX_CHARS = 20;
 
 export default function WriteMessage() {
   const { symbol, amount, unit, price } = useLocalSearchParams<{
@@ -33,6 +35,29 @@ export default function WriteMessage() {
   const insets = useSafeAreaInsets();
   const stock = findStock(symbol ?? '');
 
+  const keyboardPad = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvt, (e) => {
+      Animated.timing(keyboardPad, {
+        toValue: e.endCoordinates.height - insets.bottom + 16,
+        duration: e.duration > 0 ? e.duration : 250,
+        easing: Easing.bezier(0.36, 0.66, 0.04, 1),
+        useNativeDriver: false,
+      }).start();
+    });
+    const onHide = Keyboard.addListener(hideEvt, (e) => {
+      Animated.timing(keyboardPad, {
+        toValue: 0,
+        duration: e.duration > 0 ? e.duration : 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { onShow.remove(); onHide.remove(); };
+  }, [insets.bottom]);
+
   const charCount = message.length;
   const remaining = MAX_CHARS - charCount;
   const isNearLimit = remaining <= 10;
@@ -42,13 +67,8 @@ export default function WriteMessage() {
     <Screen padded={false}>
       <AppBar title="Write a message" showBack leftTitle />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
-      >
-        <View style={{ flex: 1 }}>
-          <View style={styles.fieldSection}>
+      <View style={{ flex: 1 }}>
+        <View style={styles.fieldSection}>
             <View
               style={[
                 styles.textField,
@@ -92,7 +112,7 @@ export default function WriteMessage() {
           </View>
         </View>
 
-        <View style={[styles.cta, { paddingBottom: 16, marginBottom: -insets.bottom }]}>
+        <Animated.View style={[styles.cta, { paddingBottom: keyboardPad }]}>
           <Button
             title="Continue"
             disabled={!canContinue}
@@ -103,8 +123,7 @@ export default function WriteMessage() {
               );
             }}
           />
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
     </Screen>
   );
 }
