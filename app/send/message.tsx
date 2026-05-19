@@ -60,7 +60,7 @@ export default function WriteMessage() {
 
   const charCount = message.length;
   const remaining = MAX_CHARS - charCount;
-  const isNearLimit = remaining <= 10;
+  const isNearLimit = charCount === MAX_CHARS;
   const canContinue = message.trim().length > 0;
 
   return (

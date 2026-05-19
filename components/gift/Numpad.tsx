@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: spacing.l,
     paddingTop: spacing.l,
-    paddingBottom: 24,
+    paddingBottom: 40,
     gap: spacing.s,
   },
   row: {
