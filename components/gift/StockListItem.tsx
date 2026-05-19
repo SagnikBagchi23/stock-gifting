@@ -81,7 +81,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.l,
-    paddingVertical: spacing.l,
+    paddingTop: spacing.l,
+    paddingBottom: spacing.m,
     gap: spacing.l,
   },
   middle: {
