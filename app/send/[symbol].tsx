@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 function formatAmountDisplay(raw: string): string {
@@ -21,9 +21,6 @@ import { spacing, type, radius, fonts } from '@/constants/tokens';
 import { formatINR, formatShares } from '@/utils/format';
 import type { GiftUnit } from '@/types';
 
-const QUICK_AMOUNTS = ['1000', '2000', '5000'];
-const QUICK_SHARES = ['1', '5', '10'];
-
 export default function ComposeGift() {
   const { symbol, price: priceParam } = useLocalSearchParams<{ symbol: string; price?: string }>();
   const router = useRouter();
@@ -31,7 +28,7 @@ export default function ComposeGift() {
   const insets = useSafeAreaInsets();
   const stock = findStock(symbol ?? '');
 
-  const [unit, setUnit] = useState<GiftUnit>('rupees');
+  const unit: GiftUnit = 'shares';
   const [amount, setAmount] = useState('');
   const [hadError, setHadError] = useState(false);
 
@@ -82,8 +79,7 @@ export default function ComposeGift() {
     Number.isFinite(livePrice) && livePrice > 0 ? livePrice : stock?.pricePerShare ?? 0;
 
   const qty = parseFloat(amount);
-  const maxRupees = (stock?.sharesHeld ?? 0) * pricePerShare;
-  const maxAllowed = unit === 'rupees' ? maxRupees : (stock?.sharesHeld ?? 0);
+  const maxAllowed = stock?.sharesHeld ?? 0;
   const hasError = Boolean(stock) && Number.isFinite(qty) && qty > 0 && qty > maxAllowed;
   const canContinue = Number.isFinite(qty) && qty > 0 && !hasError;
 
@@ -107,13 +103,14 @@ export default function ComposeGift() {
   }
 
   const subtitle = `${formatShares(stock.sharesHeld)} shares • ${formatINR(stock.investedValue)}`;
-  const quickValues = unit === 'rupees' ? QUICK_AMOUNTS : QUICK_SHARES;
+  const quickValues = useMemo(() => {
+    const held = stock?.sharesHeld ?? 0;
+    return [0.1, 0.2, 0.5]
+      .map((p) => Math.round(held * p))
+      .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i);
+  }, [stock?.sharesHeld]);
 
-  const errorMsg = hasError
-    ? unit === 'rupees'
-      ? `Max you can gift is ${formatINR(maxRupees)}`
-      : `You only have ${formatShares(stock.sharesHeld)} shares`
-    : '';
+  const errorMsg = hasError ? `You only have ${formatShares(stock.sharesHeld)} qty` : '';
 
   const handleKey = (key: string) => {
     if (key !== '⌫' && hasError) return;
@@ -122,13 +119,7 @@ export default function ComposeGift() {
       punchAmount();
       return;
     }
-    if (key === '.') {
-      if (unit === 'shares') return;
-      if (amount.includes('.')) return;
-      setAmount((prev) => (prev === '' ? '0.' : prev + '.'));
-      punchAmount();
-      return;
-    }
+    if (key === '.') return;
     if (amount === '0') {
       setAmount(key);
       punchAmount();
@@ -139,13 +130,6 @@ export default function ComposeGift() {
     punchAmount();
   };
 
-  const handleTabChange = (u: GiftUnit) => {
-    if (u === unit) return;
-    Haptics.selectionAsync();
-    setUnit(u);
-    setAmount('');
-  };
-
   return (
     <Screen padded={false}>
       <AppBar title={stock.name} subtitle={subtitle} showBack />
@@ -153,44 +137,14 @@ export default function ComposeGift() {
       {/* Center content */}
       <View style={styles.body}>
         <View style={styles.centerContent}>
-          {/* Amount / Quantity toggle */}
-          <View
-            style={[
-              styles.segmentTrack,
-              { backgroundColor: colors.backgroundSurfaceZ1, borderColor: colors.borderPrimary },
-            ]}
-          >
-            {(['rupees', 'shares'] as const).map((u) => {
-              const selected = unit === u;
-              return (
-                <Pressable
-                  key={u}
-                  onPress={() => handleTabChange(u)}
-                  style={[
-                    styles.segmentPill,
-                    {
-                      backgroundColor: selected ? colors.backgroundTertiary : 'transparent',
-                      borderWidth: selected ? 1 : 0,
-                      borderColor: selected ? colors.borderNeutral : 'transparent',
-                    },
-                  ]}
-                >
-                  <Text style={[type.bodySmallHeavy, { color: colors.contentPrimary }]}>
-                    {u === 'rupees' ? 'Amount' : 'Quantity'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {/* Eyebrow header */}
+          <Text style={[type.headingEyebrow, { color: colors.contentSecondary }]}>Enter qty</Text>
 
           {/* Prominent amount display */}
           <Animated.View style={{ alignItems: 'center', gap: spacing.xs }}>
             <Animated.View
               style={[styles.amountRow, { transform: [{ scale: amountScale }, { translateX: shakeX }] }]}
             >
-              {unit === 'rupees' && (
-                <Text style={[styles.amountText, { color: colors.contentPrimary }]}>₹</Text>
-              )}
               {amount.length > 0 && (
                 <Text style={[styles.amountText, { color: colors.contentPrimary }]}>
                   {formatAmountDisplay(amount)}
@@ -199,11 +153,6 @@ export default function ComposeGift() {
               <Animated.View
                 style={[styles.cursor, { backgroundColor: colors.contentAccent, opacity: cursorOpacity }]}
             />
-            {unit === 'shares' && amount.length > 0 && (
-              <Text style={[styles.amountText, { color: colors.contentPrimary }]}>
-                {' qty'}
-              </Text>
-            )}
             </Animated.View>
             <Animated.Text
               style={[type.bodySmall, { color: colors.contentNegative, opacity: errorOpacity }]}
@@ -229,7 +178,7 @@ export default function ComposeGift() {
                 ]}
               >
                 <Text style={[type.bodySmallHeavy, { color: colors.contentPrimary }]}>
-                  {unit === 'rupees' ? formatINR(Number(v)) : `${v} qty`}
+                  {v} qty
                 </Text>
               </Pressable>
             ))}
@@ -238,7 +187,7 @@ export default function ComposeGift() {
       </View>
 
       {/* Docked button + numpad */}
-      <View style={[styles.bottomDock, { borderTopColor: colors.borderPrimary }]}>
+      <View style={styles.bottomDock}>
         <View style={styles.buttonWrap}>
           <Button
             title="Continue"
@@ -267,20 +216,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     gap: spacing.xxxl,
-  },
-  segmentTrack: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    padding: 4,
-    gap: 4,
-  },
-  segmentPill: {
-    height: 32,
-    paddingHorizontal: spacing.l,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   amountRow: {
     flexDirection: 'row',
@@ -312,11 +247,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bottomDock: {
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   buttonWrap: {
     paddingHorizontal: spacing.l,
     paddingTop: spacing.m,
-    paddingBottom: spacing.l,
+    paddingBottom: spacing.xs,
   },
 });
