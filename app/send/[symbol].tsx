@@ -115,7 +115,7 @@ export default function ComposeGift() {
     );
   }
 
-  const subtitle = `${formatShares(stock.sharesHeld)} shares • ${formatINR(stock.investedValue)}`;
+  const subtitle = `${formatShares(stock.sharesHeld)} shares • ${formatINR(stock.sharesHeld * pricePerShare)}`;
   const quickValues = useMemo(() => {
     const held = stock?.sharesHeld ?? 0;
     return [0.1, 0.2, 0.5]
