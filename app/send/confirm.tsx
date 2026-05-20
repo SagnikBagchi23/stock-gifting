@@ -30,7 +30,7 @@ const EAS_PROJECT_ID = '3e962d09-1429-4ef5-a5ca-ffaeb85c4723';
 const EAS_CHANNEL = 'preview';
 const REDIRECT_ORIGIN = 'https://stock-gifting.vercel.app';
 
-const GROWW_LOGO = require('@/assets/groww-logo.png');
+const GROWW_LOGO = require('@/assets/mds_ic_groww.png');
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -387,8 +387,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 24,
     left: 24,
-    width: 40,
-    height: 40,
+    width: 64,
+    height: 64,
     borderRadius: radius.m,
   },
   cardBottomLeft: {
