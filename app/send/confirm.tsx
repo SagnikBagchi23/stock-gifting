@@ -60,8 +60,11 @@ export default function PreviewGift() {
   const stock = findStock(symbol ?? '');
   const stockLogo = stock ? getStockLogo(stock.symbol) : null;
   const qty = parseFloat(amount ?? '0');
+  const sharesQty = Number.isFinite(qty) ? qty : 0;
   const displayAmount =
-    unit === 'rupees' ? formatINR(qty) : `${Number.isFinite(qty) ? qty : 0} shares`;
+    unit === 'rupees'
+      ? formatINR(qty)
+      : `${sharesQty} share${sharesQty === 1 ? '' : 's'}`;
 
   // ── Gradient cross-fade state ─────────────────────────────────────────────
   const [activeGradient, setActiveGradient] = useState(0);
@@ -387,8 +390,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 24,
     left: 24,
-    width: 64,
-    height: 64,
+    width: 56,
+    height: 56,
     borderRadius: radius.m,
   },
   cardBottomLeft: {
@@ -400,14 +403,14 @@ const styles = StyleSheet.create({
   },
   amountText: {
     fontFamily: fonts.heading,
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 36,
+    lineHeight: 44,
     color: '#FFFFFF',
   },
   messageText: {
     fontFamily: fonts.heading,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 28,
     color: '#FFFFFF',
   },
   growwLogo: {
