@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -93,8 +93,11 @@ export default function PreviewGift() {
   // → deep-links into /gift/<id> → existing claim screen writes receiver name
   // to Supabase → /holdings (which reads from Supabase) shows the new stock.
   const [giftId, setGiftId] = useState<string | null>(null);
-  const [giftError, setGiftError] = useState<string | null>(null);
   const creatingRef = useRef(false);
+  // Promise that resolves once the Supabase gift row has been created.
+  // Share button can be pressed immediately; if the row isn't ready yet,
+  // we await this before opening the native share sheet.
+  const giftIdPromiseRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
     if (creatingRef.current) return;
@@ -103,7 +106,7 @@ export default function PreviewGift() {
     if (!Number.isFinite(qty) || qty <= 0) return;
     if (unit !== 'shares' && unit !== 'rupees') return;
     creatingRef.current = true;
-    (async () => {
+    giftIdPromiseRef.current = (async () => {
       const senderName = (await getDisplayName()) ?? 'A friend';
       const pricePerShare = price ? parseFloat(price) : undefined;
       const res = await createGift({
@@ -117,31 +120,37 @@ export default function PreviewGift() {
       });
       if ('id' in res) {
         setGiftId(res.id);
-      } else {
-        setGiftError(res.error);
-        creatingRef.current = false;
+        return res.id;
       }
+      // Allow a retry on next press if creation failed.
+      creatingRef.current = false;
+      giftIdPromiseRef.current = null;
+      return null;
     })();
   }, [symbol, amount, unit, price, message]);
 
-  const shareUrl = useMemo(() => {
-    if (!giftId) return '';
-    const expUrl = `exp://u.expo.dev/${EAS_PROJECT_ID}/--/gift/${giftId}?channel-name=${EAS_CHANNEL}`;
+  const buildShareUrl = useCallback((id: string) => {
+    const expUrl = `exp://u.expo.dev/${EAS_PROJECT_ID}/--/gift/${id}?channel-name=${EAS_CHANNEL}`;
     return `${REDIRECT_ORIGIN}/open.html?u=${encodeURIComponent(expUrl)}`;
-  }, [giftId]);
+  }, []);
 
   const handleShare = useCallback(async () => {
-    if (!shareUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    let id = giftId;
+    if (!id && giftIdPromiseRef.current) {
+      id = await giftIdPromiseRef.current;
+    }
+    if (!id) return;
+    const url = buildShareUrl(id);
     try {
       await Share.share({
-        message: `You've got a stock gift! Tap to open: ${shareUrl}`,
-        url: shareUrl,
+        message: `You've got a stock gift! Tap to open: ${url}`,
+        url,
       });
     } catch {
       // user cancelled — no-op
     }
-  }, [shareUrl]);
+  }, [giftId, buildShareUrl]);
 
   // ── Mount enter animation ─────────────────────────────────────────────────
   useEffect(() => {
@@ -350,18 +359,14 @@ export default function PreviewGift() {
       <View style={[styles.cta, { paddingBottom: spacing.l }]}>
         <Pressable
           onPress={handleShare}
-          disabled={!shareUrl}
           style={({ pressed }) => [
             styles.shareBtn,
-            !shareUrl && styles.shareBtnDisabled,
             pressed && styles.shareBtnPressed,
           ]}
           accessibilityRole="button"
           accessibilityLabel="Share gift link"
         >
-          <Text style={styles.shareBtnText}>
-            {giftError ? 'Try again' : shareUrl ? 'Share gift link' : 'Preparing link…'}
-          </Text>
+          <Text style={styles.shareBtnText}>Share gift link</Text>
         </Pressable>
       </View>
     </Screen>
@@ -452,9 +457,6 @@ const styles = StyleSheet.create({
   },
   shareBtnPressed: {
     opacity: 0.85,
-  },
-  shareBtnDisabled: {
-    opacity: 0.5,
   },
   shareBtnText: {
     fontFamily: fonts.heading,
