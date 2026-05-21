@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -134,11 +134,19 @@ export default function PreviewGift() {
     return `${REDIRECT_ORIGIN}/open.html?u=${encodeURIComponent(expUrl)}`;
   }, []);
 
+  const [sharing, setSharing] = useState(false);
+
   const handleShare = useCallback(async () => {
+    if (sharing) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     let id = giftId;
     if (!id && giftIdPromiseRef.current) {
-      id = await giftIdPromiseRef.current;
+      setSharing(true);
+      try {
+        id = await giftIdPromiseRef.current;
+      } finally {
+        setSharing(false);
+      }
     }
     if (!id) return;
     const url = buildShareUrl(id);
@@ -150,7 +158,7 @@ export default function PreviewGift() {
     } catch {
       // user cancelled — no-op
     }
-  }, [giftId, buildShareUrl]);
+  }, [giftId, buildShareUrl, sharing]);
 
   // ── Mount enter animation ─────────────────────────────────────────────────
   useEffect(() => {
@@ -365,8 +373,13 @@ export default function PreviewGift() {
           ]}
           accessibilityRole="button"
           accessibilityLabel="Share gift link"
+          accessibilityState={{ busy: sharing }}
         >
-          <Text style={styles.shareBtnText}>Share gift link</Text>
+          {sharing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.shareBtnText}>Share gift link</Text>
+          )}
         </Pressable>
       </View>
     </Screen>
