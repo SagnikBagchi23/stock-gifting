@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -18,6 +18,7 @@ import { DeviceMotion } from 'expo-sensors';
 
 import { Screen } from '@/components/ui/Screen';
 import { AppBar } from '@/components/ui/AppBar';
+import { Button } from '@/components/ui/Button';
 import { CardGradient, GRADIENT_SPECS } from '@/components/gift/CardGradient';
 import { findStock } from '@/data/stocks';
 import { getStockLogo } from '@/data/stockLogos';
@@ -365,22 +366,11 @@ export default function PreviewGift() {
 
       {/* Docked share section */}
       <View style={[styles.cta, { paddingBottom: spacing.l }]}>
-        <Pressable
+        <Button
+          title="Share gift link"
           onPress={handleShare}
-          style={({ pressed }) => [
-            styles.shareBtn,
-            pressed && styles.shareBtnPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Share gift link"
-          accessibilityState={{ busy: sharing }}
-        >
-          {sharing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.shareBtnText}>Share gift link</Text>
-          )}
-        </Pressable>
+          loading={sharing}
+        />
       </View>
     </Screen>
   );
@@ -460,21 +450,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.l,
     paddingTop: spacing.s,
     gap: spacing.m,
-  },
-  shareBtn: {
-    height: 56,
-    borderRadius: radius.l,
-    backgroundColor: '#04B488',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shareBtnPressed: {
-    opacity: 0.85,
-  },
-  shareBtnText: {
-    fontFamily: fonts.heading,
-    fontSize: 16,
-    lineHeight: 22,
-    color: '#FFFFFF',
   },
 });
