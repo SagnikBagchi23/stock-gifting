@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -141,23 +141,28 @@ export default function PreviewGift() {
     if (sharing) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     let id = giftId;
-    if (!id && giftIdPromiseRef.current) {
+    if (!id) {
       setSharing(true);
       try {
-        id = await giftIdPromiseRef.current;
+        if (giftIdPromiseRef.current) {
+          id = await giftIdPromiseRef.current;
+        }
       } finally {
         setSharing(false);
       }
     }
-    if (!id) return;
+    if (!id) {
+      Alert.alert('Could not create gift', 'Please check your connection and try again.');
+      return;
+    }
     const url = buildShareUrl(id);
     try {
       await Share.share({
         message: `You've got a stock gift! Tap to open: ${url}`,
         url,
       });
-    } catch {
-      // user cancelled — no-op
+    } catch (err: any) {
+      Alert.alert('Share failed', err?.message ?? 'Please try again.');
     }
   }, [giftId, buildShareUrl, sharing]);
 
